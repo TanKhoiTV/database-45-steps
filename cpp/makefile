@@ -24,3 +24,9 @@ clean:
 	rm -f $(TARGET)
 
 .PHONY: all test clean
+
+# Generate Doxygen documentation
+doc:
+	doxygen Doxyfile
+
+.PHONY: doc

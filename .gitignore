@@ -1,1 +1,8 @@
+# Doxygen output
+cpp/html/
+cpp/latex/
+
+# Build artifacts
+cpp/kv_test
+
 db_project+solution/
