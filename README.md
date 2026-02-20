@@ -5,6 +5,12 @@ Inspired by Trial of Code's [Code a database in 45 steps (Go)](https://trialofco
 
 **Note**: The `cpp/` folder is the root of the project. At the same folder level as `cpp`, there is an untracked folder (which is invisible to you) containing Go files from Trial of Code.
 
+## Features
+
+- C++17 Standards: Uses `std::byte`, `std::optional`, and `std::string_view` for memory safety.
+- Binary Safe: Supports raw byte vectors as keys and values.
+- Doxygen Support: Documented source code for automated manual generation.
+
 ---
 
 ## Getting started
@@ -56,3 +62,9 @@ With `cpp/` as root:
 ## License
 
 [MIT License](https://choosealicense.com/licenses/mit/).
+
+## Project History
+
+### Log-based KV
+
+2026-02-20: Project created. Added KV interface.
