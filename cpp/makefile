@@ -22,8 +22,13 @@ test: $(TARGET)
 # Clean build artifacts
 clean:
 	rm -f $(TARGET)
+	rm -rf html/ latex/
 
-.PHONY: all test clean
+# Memory check using Valgrind
+memcheck: $(TARGET)
+	valgrind --leak-check=full ./$(TARGET)
+
+.PHONY: all test clean memcheck
 
 # Generate Doxygen documentation
 doc:
