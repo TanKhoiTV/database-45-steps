@@ -173,9 +173,13 @@ class Log {
      * @brief Open the log file for appending and reading.
      * 
      * Perform these checks/steps:
+     * 
      * - Returns an error if @p filename exists and is a directory.
+     * 
      * - Attempts to open the file with: in | out | binary | app; creates the file if it doesn't exist.
+     * 
      * - On failure maps common @c errno values to `std::errc`-derived errors.
+     * 
      * - Clears any EOF flags on success so subsequent streaming operations are usable.
      * 
      * @return error Default-constructed (no error) on success; otherwise an error code describing the failure.
@@ -242,13 +246,14 @@ class Log {
      * @return `std::pair<bool, error>` The boolean signifies EOF in which case no error is returned.
      */
     std::pair<bool, error> Read(Entry &ent) {
-        error err = ent.Decode(fs);
-        if (err) return { false, err };
-        
+        fs.peek();
         if (fs.eof()) {
             fs.clear(); // Clears the EOF bit so the stream is usable later
             return { true, {} };
         }
+
+        error err = ent.Decode(fs);
+        if (err) return { false, err };
         return { false, {} };
     }
 
@@ -331,7 +336,7 @@ class KV {
             return { false, err };
         }
 
-        auto [item, inserted] = mem.try_emplace(key);
+        auto [item, inserted] = mem.try_emplace(key, val);
         if (inserted) {
             return { true, {} };
         }

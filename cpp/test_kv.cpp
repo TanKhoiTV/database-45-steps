@@ -18,23 +18,13 @@ bool operator==(const Entry& a, const Entry& b) {
 
 const std::string test_db = ".test_db";
 
-// class KVTest : public ::testing::Test {
-//     protected:
-
-//     void SetUp() override {
-//         std::filesystem::remove(test_db);
-//     }
-
-//     void TearDown() override {
-//         std::filesystem::remove(test_db);
-//     }
-// };
-
 TEST(KVTest, BasicOperationsAndPersistence) {
+    std::filesystem::remove(test_db);
+    
     KV kv(test_db);
     error open_err = kv.Open();
     std::cerr << open_err.message() << std::endl;
-    ASSERT_FALSE(kv.Open());
+    ASSERT_FALSE(open_err);
 
     bytes key = to_bytes("conf");
     bytes val1 = to_bytes("v1");
@@ -88,7 +78,7 @@ TEST(KVTest, BasicOperationsAndPersistence) {
     ASSERT_FALSE(s_err);
 
     // --- Persistence TEST ---
-    kv.Close();
+    ASSERT_FALSE(kv.Close());
     ASSERT_FALSE(kv.Open());
 
     auto [new_r1, new_err1] = kv.Get(key);
@@ -100,7 +90,9 @@ TEST(KVTest, BasicOperationsAndPersistence) {
     EXPECT_EQ(new_r2.value(), new_val);
     EXPECT_FALSE(new_err2);
     
-    kv.Close();
+    ASSERT_FALSE(kv.Close());
+
+    std::filesystem::remove(test_db);
 }
 
 TEST(EntryTest, EncodeDecode) {
