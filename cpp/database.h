@@ -1,8 +1,8 @@
 /**
  * @file database.h
  * @author Tran Van Tan Khoi (tranvantankhoi@gmail.com)
- * @brief A basic in-memory Key-Value database implementation
- * @version 0.3.0-alpha.4
+ * @brief A basic in-memory Key-Value database implementation with append-only logging.
+ * @version 0.3.0-alpha.5
  * @date 2026-02-20
  * 
  * @copyright Copyright (c) under MIT license, 2026
@@ -24,201 +24,11 @@
 #include <filesystem>       // std::filesystem
 #include <cerrno>           // errno
 
-/** Aliases for common types */
+/** Aliases for readability */
 
 using bytes = std::vector<std::byte>;
 using error = std::error_code;
 using std::string;
-
-/**
- * @brief A functor allowing `bytes` to be used as keys in hash maps.
- */
-struct ByteVectorHash {
-    size_t operator()(const bytes &v) const noexcept {
-        return std::hash<std::string_view>{}(
-            std::string_view(reinterpret_cast<const char*>(v.data()), v.size())
-        );
-    }
-};
-
-
-class Log {
-    public:
-
-    explicit Log(std::string fname) : filename(std::move(fname)) {}
-
-    string filename;
-    std::fstream fs;    // File Stream
-
-    error Open() {
-        // Error handling: File name is a directory instead of file
-        if (std::filesystem::exists(filename) && std::filesystem::is_directory(filename))
-            return std::make_error_code(std::errc::is_a_directory);
-
-        // Try opening the file for reads and writes in binary, with writes append to end of file. Append also creates the file if it doesn't exist.
-        fs.open(filename, std::ios::in | std::ios::out | std::ios::binary | std::ios::app);
-        
-        // Handling common errors
-        if (!fs.is_open()) {
-            switch (errno) {
-                case EACCES: return std::make_error_code(std::errc::permission_denied);
-                case ENOENT: return std::make_error_code(std::errc::no_such_file_or_directory);
-                case ENOSPC: return std::make_error_code(std::errc::no_space_on_device);
-                default:    return std::make_error_code(std::errc::io_error);
-            }
-        }
-
-        fs.clear(); // Clear any potential EOF bits from the check
-        return {};
-    }
-
-    error Close() {
-        if (!fs.is_open())
-            return {};
-        
-        fs.close();
-        if (fs.fail()) {
-            return std::make_error_code(std::errc::io_error);
-        }
-        return {};
-    }
-
-    error Write(const Entry &ent) {
-        bytes data_bytes = ent.Encode();
-        fs.write(reinterpret_cast<const char *>(data_bytes.data()), data_bytes.size());
-        if (fs.fail()) {
-            switch errno {
-                case ENOSPC:    return std::make_error_code(std::errc::no_space_on_device);
-                case EIO:       return std::make_error_code(std::errc::io_error);
-                default:        return std::make_error_code(std::errc::broken_pipe);
-            }
-        }
-        fs.flush();
-        return {};
-    }
-
-    std::pair<bool, error> Read(Entry &ent) {
-        error err = ent.Decode(fs);
-
-        if (!err)
-            return { false, {} };
-        
-        if (fs.eof()) {
-            fs.clear(); // Clears the EOF bit so the stream is usable later
-            return { true, {}} ;
-        }
-
-        return { false, err };
-    }
-
-    ~Log() {
-        if (fs.is_open())
-            fs.close();
-    }
-};
-
-/**
- * @brief KV provides a simple in-memory key-value store with binary support.
- * It tracks state changes for Set and Del operations.
- */
-class KV {
-    private:
-
-    Log log;
-    std::unordered_map<bytes, bytes, ByteVectorHash> mem;
-
-    public:
-
-    explicit KV(const std::string &path) : log(path) {}
-
-    KV(const KV &) = delete;
-    KV &operator=(const KV &) = delete;
-
-    /**
-     * @brief Clears any existing in-memory data.
-     * Then reads from the internal log to initialize the database.
-     * @return An error code. 
-     */
-    error Open() {
-        if (error err = log.Open(); err)
-            return err;
-
-        mem.clear();
-
-        // Read from the beginning by moving the read position
-        log.fs.seekg(0, std::ios::beg);
-
-        Entry ent;
-        while (true) {
-            auto [eof, err] = log.Read(ent);
-            if (err) return err;
-            if (eof) break;
-
-            if (ent.deleted) mem.erase(ent.key);
-            else mem[ent.key] = ent.val;
-        }
-
-        return {};
-    }
-
-    /**
-     * @brief Closes the database.
-     * 
-     * @return An error code.
-     */
-    error Close() { return log.Close(); }
-
-    /**
-     * @brief Retrieves a value by key.
-     * Returns a pair containing the value (if found) and an error code.
-     * @param key 
-     * @return `pair<optional<bytes>, error>`. This method returns no error code for now. 
-     */
-    std::pair<std::optional<bytes>, error> Get(const bytes &key) const {
-        auto item = mem.find(key);
-        
-        if (item == mem.end())
-            return { std::nullopt, {} };
-        return { item->second, {} };
-    }
-
-    /**
-     * @brief Inserts or updates a value.
-     * 
-     * @param key 
-     * @param val 
-     * @return `true` if the key was newly added or the value was different.
-     */
-    std::pair<bool, error> Set(const bytes &key, const bytes &val) {
-        if (error err = log.Write(Entry{key, val, false}); err) {
-            return { false, err };
-        }
-
-        auto [item, inserted] = mem.try_emplace(key);
-        if (inserted) {
-            return { true, {} };
-        }
-
-        bool updated = (item->second != val);
-        if (updated)
-            item->second = val;
-        return { updated, {} };
-    }
-
-    /**
-     * @brief Removes a key from the store.
-     * 
-     * @param key 
-     * @return `true` if the key existed and was successfully deleted.
-     */
-    std::pair<bool, error> Del(const bytes &key) {
-        if (error err = log.Write(Entry{key, {}, true}); err) {
-            return { false, err };
-        }
-
-        return { mem.erase(key) > 0, {} };
-    }
-};
 
 
 /**
@@ -233,8 +43,8 @@ struct Entry {
     static constexpr size_t FLAG_OFFSET = 8;
 
     // Safety Limits
-    static constexpr size_t MAX_KEY_SIZE = 1024;
-    static constexpr size_t MAX_VAL_SIZE = 1024 * 1024;
+    static constexpr size_t MAX_KEY_SIZE = 1024;            // 1 KB limit
+    static constexpr size_t MAX_VAL_SIZE = 1024 * 1024;     // 1 MB limit
 
     bytes key;
     bytes val;
@@ -245,7 +55,7 @@ struct Entry {
     Entry(bytes _key, bytes _val, bool _deleted)
         : key(std::move(_key)), val(std::move(_val)), deleted(_deleted) {}
 
-    // Pack/Load a 32-bit integer (4 bytes) into a buffer in Little Endian
+    /** @brief Packs/Loads a 32-bit integer (4 bytes) into a buffer in Little Endian */
     static void pack_u32(bytes &buf, size_t offset, uint32_t val) {
         buf[offset]     = static_cast<std::byte>(val & 0xFF);
         buf[offset + 1] = static_cast<std::byte>((val >> 8) & 0xFF);
@@ -253,14 +63,17 @@ struct Entry {
         buf[offset + 3] = static_cast<std::byte>((val >> 24) & 0xFF);
     }
 
-    // Unpack a Little Endian 32-bit integer from buffer
+    /** @brief Unpacks Little Endian bytes from buffer */
     static uint32_t unpack_u32(const uint8_t *buf) {
-        return buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+        return static_cast<uint32_t>(buf[0]) | 
+            (static_cast<uint32_t>(buf[1]) << 8) | 
+            (static_cast<uint32_t>(buf[2]) << 16) | 
+            (static_cast<uint32_t>(buf[3]) << 24);
     }
 
     /**
      * @brief Serializes the entry into a byte buffer.
-     * The format is [4-byte key size | 4-byte value size | 1-byte 'deleted' flag | key payload | value payload].
+     * Format: `[klen(4)|vlen(4)|flag(1)|key|val]`.
      * @return bytes containing the encoded entry.
      */
     bytes Encode() const {
@@ -314,8 +127,233 @@ struct Entry {
             val.resize(vlen);
             if (!is.read(reinterpret_cast<char *>(val.data()), vlen))
                 return std::make_error_code(std::errc::io_error);
+        } else {
+            val.clear();
         }
         
         return {};
     }
 };
+
+/**
+ * @brief A functor allowing `bytes` to be used as keys in hash maps.
+ */
+struct ByteVectorHash {
+    size_t operator()(const bytes &v) const noexcept {
+        return std::hash<std::string_view>{}(
+            std::string_view(reinterpret_cast<const char*>(v.data()), v.size())
+        );
+    }
+};
+
+
+/**
+ * @brief Simple file-backed append/read log for encoded Entry objects
+ * 
+ * Manages a file stream used to append encoded entries and decode entries from the file.
+ * 
+ * @note This class is not thread-safe. Callers must synchronize access if the same Log instance is used concurrently.
+ */
+class Log {
+    public:
+
+    /**
+     * @brief Construct a new Log object
+     * 
+     * @param fname Path to the log file. The path is stored by value.
+     * 
+     * The constructor does not open the file; call `Open()` to create/open the underlying file stream.
+     */
+    explicit Log(std::string fname) : filename(std::move(fname)) {}
+
+    string filename;
+    std::fstream fs;    // File Stream
+
+    /**
+     * @brief Open the log file for appending and reading.
+     * 
+     * Perform these checks/steps:
+     * - Returns an error if @p filename exists and is a directory.
+     * - Attempts to open the file with: in | out | binary | app; creates the file if it doesn't exist.
+     * - On failure maps common @c errno values to `std::errc`-derived errors.
+     * - Clears any EOF flags on success so subsequent streaming operations are usable.
+     * 
+     * @return error Default-constructed (no error) on success; otherwise an error code describing the failure.
+     */
+    error Open() {
+        // Error handling: File name is a directory instead of file
+        if (std::filesystem::exists(filename) && std::filesystem::is_directory(filename))
+            return std::make_error_code(std::errc::is_a_directory);
+
+        // Try opening the file for reads and writes in binary, with writes append to end of file. Append also creates the file if it doesn't exist.
+        fs.open(filename, std::ios::in | std::ios::out | std::ios::binary | std::ios::app);
+        
+        // Handling common errors
+        if (!fs.is_open()) {
+            switch (errno) {
+                case EACCES: return std::make_error_code(std::errc::permission_denied);
+                case ENOENT: return std::make_error_code(std::errc::no_such_file_or_directory);
+                case ENOSPC: return std::make_error_code(std::errc::no_space_on_device);
+                default:    return std::make_error_code(std::errc::io_error);
+            }
+        }
+
+        fs.clear(); // Clear any potential EOF bits from the check
+        return {};
+    }
+
+    /**
+     * @brief Close the underlying file stream.
+     * 
+     * @return error No error on success; `io_error` otherwise.
+     */
+    error Close() {
+        if (!fs.is_open()) return {};
+        fs.close();
+        return fs.fail() ? std::make_error_code(std::errc::io_error) : error{};
+    }
+
+    /**
+     * @brief Append an encoded Entry to the log file
+     * 
+     * @param ent Entry to encode and write
+     * @return error 
+     * @note The method assumes the file stream is opened. 
+     * Behavior is undefined or an I/O error is triggered if called on a closed stream.
+     */
+    error Write(const Entry &ent) {
+        bytes data_bytes = ent.Encode();
+        fs.write(reinterpret_cast<const char *>(data_bytes.data()), data_bytes.size());
+        if (fs.fail()) {
+            switch (errno) {
+                case ENOSPC:    return std::make_error_code(std::errc::no_space_on_device);
+                case EIO:       return std::make_error_code(std::errc::io_error);
+                default:        return std::make_error_code(std::errc::broken_pipe);
+            }
+        }
+        fs.flush(); // Ensure data reaches OS cache
+        return {};
+    }
+
+    /**
+     * @brief Read and decode the next entry from the file stream.
+     * 
+     * @param[out] ent Entry object to be populated with decoded data.
+     * @return `std::pair<bool, error>` The boolean signifies EOF in which case no error is returned.
+     */
+    std::pair<bool, error> Read(Entry &ent) {
+        error err = ent.Decode(fs);
+        if (err) return { false, err };
+        
+        if (fs.eof()) {
+            fs.clear(); // Clears the EOF bit so the stream is usable later
+            return { true, {} };
+        }
+        return { false, {} };
+    }
+
+    ~Log() {
+        if (fs.is_open())
+            fs.close();
+    }
+};
+
+/**
+ * @brief KV provides a simple in-memory key-value store with binary support.
+ * It tracks state changes for Set and Del operations.
+ */
+class KV {
+    private:
+
+    Log log;
+    std::unordered_map<bytes, bytes, ByteVectorHash> mem;
+
+    public:
+
+    explicit KV(const std::string &path) : log(path) {}
+
+    // Disable copying to avoid issues with the file handle
+    KV(const KV &) = delete;
+    KV &operator=(const KV &) = delete;
+
+    /**
+     * @brief Clears any existing in-memory data.
+     * Then reads from the internal log to initialize the database.
+     * @return An error code. 
+     */
+    error Open() {
+        if (error err = log.Open(); err) return err;
+
+        mem.clear();
+        log.fs.seekg(0, std::ios::beg); // Read from the beginning by moving the read position
+
+        Entry ent;
+        while (true) {
+            auto [eof, err] = log.Read(ent);
+            if (err) return err;
+            if (eof) break;
+
+            if (ent.deleted) mem.erase(ent.key);
+            else mem[ent.key] = std::move(ent.val);
+        }
+
+        return {};
+    }
+
+    /**
+     * @brief Closes the database.
+     * 
+     * @return An error code (if there's any).
+     */
+    error Close() { return log.Close(); }
+
+    /**
+     * @brief Retrieves a value by key.
+     * Returns a pair containing the value (if found) and an error code.
+     * @param key 
+     * @return `pair<optional<bytes>, error>`. This method returns no error code for now. 
+     */
+    std::pair<std::optional<bytes>, error> Get(const bytes &key) const {
+        auto item = mem.find(key);
+        if (item == mem.end()) return { std::nullopt, {} };
+        return { item->second, {} };
+    }
+
+    /**
+     * @brief Inserts or updates a value.
+     * 
+     * @param key 
+     * @param val 
+     * @return `true` if the key was newly added or the value was different.
+     */
+    std::pair<bool, error> Set(const bytes &key, const bytes &val) {
+        if (error err = log.Write(Entry{key, val, false}); err) {
+            return { false, err };
+        }
+
+        auto [item, inserted] = mem.try_emplace(key);
+        if (inserted) {
+            return { true, {} };
+        }
+
+        bool updated = (item->second != val);
+        if (updated)
+            item->second = val;
+        return { updated, {} };
+    }
+
+    /**
+     * @brief Removes a key from the store.
+     * 
+     * @param key 
+     * @return `true` if the key existed and was successfully deleted.
+     */
+    std::pair<bool, error> Del(const bytes &key) {
+        if (error err = log.Write(Entry{key, {}, true}); err) {
+            return { false, err };
+        }
+
+        return { mem.erase(key) > 0, {} };
+    }
+};
+
