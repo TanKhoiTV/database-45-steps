@@ -2,7 +2,7 @@
  * @file database.h
  * @author Tran Van Tan Khoi (tranvantankhoi@gmail.com)
  * @brief A basic in-memory Key-Value database implementation
- * @version 0.3.0-alpha.3
+ * @version 0.3.0-alpha.4
  * @date 2026-02-20
  * 
  * @copyright Copyright (c) under MIT license, 2026
@@ -44,6 +44,8 @@ struct ByteVectorHash {
 
 class Log {
     public:
+
+    explicit Log(std::string fname) : filename(std::move(fname)) {}
 
     string filename;
     std::fstream fs;    // File Stream
@@ -126,6 +128,11 @@ class KV {
     std::unordered_map<bytes, bytes, ByteVectorHash> mem;
 
     public:
+
+    explicit KV(const std::string &path) : log(path) {}
+
+    KV(const KV &) = delete;
+    KV &operator=(const KV &) = delete;
 
     /**
      * @brief Clears any existing in-memory data.
