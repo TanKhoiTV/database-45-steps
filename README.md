@@ -10,6 +10,11 @@ Inspired by Trial of Code's [Code a database in 45 steps (Go)](https://trialofco
 - C++17 Standards: Uses `std::byte`, `std::optional`, and `std::string_view` for memory safety.
 - Binary Safe: Supports raw byte vectors as keys and values.
 - Doxygen Support: Documented source code for automated manual generation.
+- [NEW!] Now supports sequential logging to save to storage.
+
+## Drawbacks
+
+- The database is not yet to be thread-safe. Please do not try to run multiple instances of the database, as there is no guarantee what would happen to your data.
 
 ---
 
@@ -74,5 +79,6 @@ Unused files: `database.cpp` and `main.cpp`.
 
 ### Log-based KV
 
+- 2026-02-22: Added sequential logging to save to storage. Added custom error codes.
 - 2026-02-21: Added data serialization.
 - 2026-02-20: Project created. Added KV interface.

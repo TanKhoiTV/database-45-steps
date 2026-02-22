@@ -2,7 +2,7 @@
  * @file database.h
  * @author Tran Van Tan Khoi (tranvantankhoi@gmail.com)
  * @brief A basic in-memory Key-Value database implementation with append-only logging.
- * @version 0.3.0-alpha.7
+ * @version 0.3.0
  * @date 2026-02-20
  * 
  * @copyright Copyright (c) under MIT license, 2026
