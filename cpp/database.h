@@ -2,7 +2,7 @@
  * @file database.h
  * @author Tran Van Tan Khoi (tranvantankhoi@gmail.com)
  * @brief A basic in-memory Key-Value database implementation
- * @version 0.3.0-alpha.2
+ * @version 0.3.0-alpha.3
  * @date 2026-02-20
  * 
  * @copyright Copyright (c) under MIT license, 2026
@@ -122,26 +122,44 @@ class Log {
 class KV {
     private:
 
+    Log log;
     std::unordered_map<bytes, bytes, ByteVectorHash> mem;
 
     public:
 
     /**
-     * @brief Initializes the database. Clears any existing in-memory data.
-     * 
-     * @return An error code. This method returns no error code for now.
+     * @brief Clears any existing in-memory data.
+     * Then reads from the internal log to initialize the database.
+     * @return An error code. 
      */
     error Open() {
+        if (error err = log.Open(); err)
+            return err;
+
         mem.clear();
+
+        // Read from the beginning by moving the read position
+        log.fs.seekg(0, std::ios::beg);
+
+        Entry ent;
+        while (true) {
+            auto [eof, err] = log.Read(ent);
+            if (err) return err;
+            if (eof) break;
+
+            if (ent.deleted) mem.erase(ent.key);
+            else mem[ent.key] = ent.val;
+        }
+
         return {};
     }
 
     /**
-     * @brief Closes the database. Currently a no-op for the in-memory version.
+     * @brief Closes the database.
      * 
-     * @return An error code. This method returns no error code for now.
+     * @return An error code.
      */
-    error Close() { return {}; }
+    error Close() { return log.Close(); }
 
     /**
      * @brief Retrieves a value by key.
@@ -165,9 +183,12 @@ class KV {
      * @return `true` if the key was newly added or the value was different.
      */
     std::pair<bool, error> Set(const bytes &key, const bytes &val) {
-        auto item = mem.find(key);
-        if (item == mem.end()) {
-            mem.emplace(key, val);
+        if (error err = log.Write(Entry{key, val, false}); err) {
+            return { false, err };
+        }
+
+        auto [item, inserted] = mem.try_emplace(key);
+        if (inserted) {
             return { true, {} };
         }
 
@@ -184,6 +205,10 @@ class KV {
      * @return `true` if the key existed and was successfully deleted.
      */
     std::pair<bool, error> Del(const bytes &key) {
+        if (error err = log.Write(Entry{key, {}, true}); err) {
+            return { false, err };
+        }
+
         return { mem.erase(key) > 0, {} };
     }
 };
@@ -207,6 +232,11 @@ struct Entry {
     bytes key;
     bytes val;
     bool deleted;
+
+    Entry() : deleted(false) {}
+
+    Entry(bytes _key, bytes _val, bool _deleted)
+        : key(std::move(_key)), val(std::move(_val)), deleted(_deleted) {}
 
     // Pack/Load a 32-bit integer (4 bytes) into a buffer in Little Endian
     static void pack_u32(bytes &buf, size_t offset, uint32_t val) {
