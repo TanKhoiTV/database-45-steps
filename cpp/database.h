@@ -2,7 +2,7 @@
  * @file database.h
  * @author Tran Van Tan Khoi (tranvantankhoi@gmail.com)
  * @brief A basic in-memory Key-Value database implementation with append-only logging.
- * @version 0.3.0-alpha.6
+ * @version 0.3.0-alpha.7
  * @date 2026-02-20
  * 
  * @copyright Copyright (c) under MIT license, 2026
@@ -30,6 +30,43 @@ using bytes = std::vector<std::byte>;
 using error = std::error_code;
 using std::string;
 
+/** Custom error codes */
+
+enum class db_error {
+    ok = 0,
+    truncated_header,
+    truncated_payload,
+    key_too_large,
+    value_too_large,
+    io_failure
+};
+
+struct DBErrorCategory : std::error_category {
+    const char *name() const noexcept override { return "KVDatabase"; }
+
+    string message(int ev) const override {
+        switch (static_cast<db_error>(ev)) {
+            case db_error::truncated_header:    return "Entry header is incomplete or file is truncated";
+            case db_error::truncated_payload:   return "Key or value payload is missing expected bytes";
+            case db_error::key_too_large:       return "Key size exceeds limit";
+            case db_error::value_too_large:     return "Value size exceeds limit";
+            case db_error::io_failure:          return std::make_error_code(std::errc::io_error).message();
+            default:                            return "Unknown database error";
+        }
+    }
+};
+
+inline const DBErrorCategory &db_category() {
+    static DBErrorCategory instance;
+    return instance;
+}
+
+inline error make_error_code(db_error e) {
+    return { static_cast<int>(e), db_category() };
+}
+
+template <>
+struct std::is_error_code_enum<db_error> : std::true_type {};
 
 /**
  * @brief Represents a single database entry for serialization
@@ -104,7 +141,7 @@ struct Entry {
     error Decode(std::istream &is) {
         uint8_t header[HEADER_SIZE];
         if (!is.read(reinterpret_cast<char *>(header), HEADER_SIZE)) {
-            return std::make_error_code(std::errc::illegal_byte_sequence);
+            return db_error::truncated_header;
         }
 
         // Unpack the header
@@ -113,20 +150,21 @@ struct Entry {
         deleted = (header[FLAG_OFFSET] != 0);
 
         // Impose data limits
-        if (klen > MAX_KEY_SIZE || vlen > MAX_VAL_SIZE) {
-            return std::make_error_code(std::errc::result_out_of_range);
-        }
+        if (klen > MAX_KEY_SIZE)
+            return db_error::key_too_large;
+        if (vlen > MAX_VAL_SIZE)
+            return db_error::value_too_large;
 
         // Unpack the key
         key.resize(klen);
         if (!is.read(reinterpret_cast<char *>(key.data()), klen))
-            return std::make_error_code(std::errc::io_error);
+            return db_error::truncated_payload;
         
         // Unpack the value data if it exists
         if (!deleted) {
             val.resize(vlen);
             if (!is.read(reinterpret_cast<char *>(val.data()), vlen))
-                return std::make_error_code(std::errc::io_error);
+                return db_error::truncated_payload;
         } else {
             val.clear();
         }
@@ -189,7 +227,7 @@ class Log {
 
         // Error handling: File name is a directory instead of file
         if (std::filesystem::exists(filename) && std::filesystem::is_directory(filename))
-            return std::make_error_code(std::errc::is_a_directory);
+            return make_error_code(std::errc::is_a_directory);
 
         // Try opening the file for reads and writes in binary, with writes append to end of file. Append also creates the file if it doesn't exist.
         fs.open(filename, std::ios::in | std::ios::out | std::ios::binary | std::ios::app);
