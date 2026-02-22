@@ -2,7 +2,7 @@
  * @file database.h
  * @author Tran Van Tan Khoi (tranvantankhoi@gmail.com)
  * @brief A basic in-memory Key-Value database implementation
- * @version 0.2.0
+ * @version 0.3.0-alpha.1
  * @date 2026-02-20
  * 
  * @copyright Copyright (c) under MIT license, 2026
@@ -20,6 +20,9 @@
 #include <algorithm>        // std::copy
 #include <cstdint>          // uint32_t
 #include <iostream>         // std::istream
+#include <fstream>          // std::fstream
+#include <filesystem>       // std::filesystem
+#include <cerrno>           // errno
 
 /** Aliases for common types */
 
@@ -35,6 +38,75 @@ struct ByteVectorHash {
         return std::hash<std::string_view>{}(
             std::string_view(reinterpret_cast<const char*>(v.data()), v.size())
         );
+    }
+};
+
+
+class Log {
+    public:
+
+    string filename;
+    std::fstream fs;    // File Stream
+
+    error Open() {
+        // Error handling: File name is a directory instead of file
+        if (std::filesystem::exists(filename) && std::filesystem::is_directory(filename))
+            return std::make_error_code(std::errc::is_a_directory);
+
+        // Try opening the file for reads and writes in binary, with writes append to end of file. Append also creates the file if it doesn't exist.
+        fs.open(filename, std::ios::in | std::ios::out | std::ios::binary | std::ios::app);
+        
+        // Handling common errors
+        if (!fs.is_open()) {
+            switch (errno) {
+                case EACCES: return std::make_error_code(std::errc::permission_denied);
+                case ENOENT: return std::make_error_code(std::errc::no_such_file_or_directory);
+                case ENOSPC: return std::make_error_code(std::errc::no_space_on_device);
+                default:    return std::make_error_code(std::errc::io_error);
+            }
+        }
+
+        fs.clear(); // Clear any potential EOF bits from the check
+        return {};
+    }
+
+    error Close() {
+        if (!fs.is_open())
+            return {};
+        
+        fs.close();
+        if (fs.fail()) {
+            return std::make_error_code(std::errc::io_error);
+        }
+        return {};
+    }
+
+    error Write(const Entry &ent) {
+        bytes data_bytes = ent.Encode();
+        fs.write(reinterpret_cast<const char *>(data_bytes.data()), data_bytes.size());
+        if (fs.fail())
+            return std::make_error_code(std::errc::io_error);
+        fs.flush();
+        return {};
+    }
+
+    std::pair<bool, error> Read(Entry &ent) {
+        error err = ent.Decode(fs);
+
+        if (!err)
+            return { false, {} };
+        
+        if (fs.eof()) {
+            fs.clear(); // Clears the EOF bit so the stream is usable later
+            return { true, {}} ;
+        }
+
+        return { false, err };
+    }
+
+    ~Log() {
+        if (fs.is_open())
+            fs.close();
     }
 };
 
