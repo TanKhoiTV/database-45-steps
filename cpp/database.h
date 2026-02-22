@@ -84,8 +84,13 @@ class Log {
     error Write(const Entry &ent) {
         bytes data_bytes = ent.Encode();
         fs.write(reinterpret_cast<const char *>(data_bytes.data()), data_bytes.size());
-        if (fs.fail())
-            return std::make_error_code(std::errc::io_error);
+        if (fs.fail()) {
+            switch errno {
+                case ENOSPC:    return std::make_error_code(std::errc::no_space_on_device);
+                case EIO:       return std::make_error_code(std::errc::io_error);
+                default:        return std::make_error_code(std::errc::broken_pipe);
+            }
+        }
         fs.flush();
         return {};
     }
