@@ -2,7 +2,7 @@
  * @file database.h
  * @author Tran Van Tan Khoi (tranvantankhoi@gmail.com)
  * @brief A basic in-memory Key-Value database implementation
- * @version 0.3.0-alpha.1
+ * @version 0.3.0-alpha.2
  * @date 2026-02-20
  * 
  * @copyright Copyright (c) under MIT license, 2026
@@ -194,35 +194,53 @@ class KV {
  * 
  */
 struct Entry {
+    // Header layout constants
+    static constexpr size_t HEADER_SIZE = 9;
+    static constexpr size_t KLEN_OFFSET = 0;
+    static constexpr size_t VLEN_OFFSET = 4;
+    static constexpr size_t FLAG_OFFSET = 8;
+
+    // Safety Limits
+    static constexpr size_t MAX_KEY_SIZE = 1024;
+    static constexpr size_t MAX_VAL_SIZE = 1024 * 1024;
+
     bytes key;
     bytes val;
+    bool deleted;
+
+    // Pack/Load a 32-bit integer (4 bytes) into a buffer in Little Endian
+    static void pack_u32(bytes &buf, size_t offset, uint32_t val) {
+        buf[offset]     = static_cast<std::byte>(val & 0xFF);
+        buf[offset + 1] = static_cast<std::byte>((val >> 8) & 0xFF);
+        buf[offset + 2] = static_cast<std::byte>((val >> 16) & 0xFF);
+        buf[offset + 3] = static_cast<std::byte>((val >> 24) & 0xFF);
+    }
+
+    // Unpack a Little Endian 32-bit integer from buffer
+    static uint32_t unpack_u32(const uint8_t *buf) {
+        return buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+    }
 
     /**
      * @brief Serializes the entry into a byte buffer.
-     * The format is [4-byte klen | 4-byte vlen | key payload | value payload].
+     * The format is [4-byte key size | 4-byte value size | 1-byte 'deleted' flag | key payload | value payload].
      * @return bytes containing the encoded entry.
      */
     bytes Encode() const {
         uint32_t klen = static_cast<uint32_t>(key.size());
         uint32_t vlen = static_cast<uint32_t>(val.size());
 
-        bytes buf(8 + klen + vlen);
+        bytes buf(HEADER_SIZE + klen + (deleted ? 0 : vlen));
 
-        // Packing `klen` into buffer in Little Endian
-        buf[0] = static_cast<std::byte>(klen & 0xFF);
-        buf[1] = static_cast<std::byte>((klen >> 8) & 0xFF);
-        buf[2] = static_cast<std::byte>((klen >> 16) & 0xFF);
-        buf[3] = static_cast<std::byte>((klen >> 24) & 0xFF);
-
-        // Packing 'vlen' into buffer in Little Endian
-        buf[4] = static_cast<std::byte>(vlen & 0xFF);
-        buf[5] = static_cast<std::byte>((vlen >> 8) & 0xFF);
-        buf[6] = static_cast<std::byte>((vlen >> 16) & 0xFF);
-        buf[7] = static_cast<std::byte>((vlen >> 24) & 0xFF);
+        pack_u32(buf, KLEN_OFFSET, klen);
+        pack_u32(buf, VLEN_OFFSET, vlen);
+        buf[FLAG_OFFSET] = static_cast<std::byte>(deleted ? 1 : 0);
 
         // Copying key and value data
-        std::copy(key.begin(), key.end(), buf.begin() + 8);
-        std::copy(val.begin(), val.end(), buf.begin() + 8 + klen);
+        std::copy(key.begin(), key.end(), buf.begin() + HEADER_SIZE);
+        if (!deleted) {
+            std::copy(val.begin(), val.end(), buf.begin() + HEADER_SIZE + klen);
+        }
 
         return buf;
     }
@@ -234,23 +252,32 @@ struct Entry {
      * @return An error if reading fails.
      */
     error Decode(std::istream &is) {
-        uint8_t header[8];
-        if (!is.read(reinterpret_cast<char *>(header), 8)) {
-            return std::make_error_code(std::errc::io_error);
+        uint8_t header[HEADER_SIZE];
+        if (!is.read(reinterpret_cast<char *>(header), HEADER_SIZE)) {
+            return std::make_error_code(std::errc::illegal_byte_sequence);
         }
 
-        // Unpacking lengths
-        uint32_t klen = header[0] | (header[1] << 8) | (header[2] << 16) | (header[3] << 24);
-        uint32_t vlen = header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24);
+        // Unpack the header
+        uint32_t klen = unpack_u32(header + KLEN_OFFSET);
+        uint32_t vlen = unpack_u32(header + VLEN_OFFSET);
+        deleted = (header[FLAG_OFFSET] != 0);
 
+        // Impose data limits
+        if (klen > MAX_KEY_SIZE || vlen > MAX_VAL_SIZE) {
+            return std::make_error_code(std::errc::result_out_of_range);
+        }
+
+        // Unpack the key
         key.resize(klen);
-        val.resize(vlen);
-
         if (!is.read(reinterpret_cast<char *>(key.data()), klen))
             return std::make_error_code(std::errc::io_error);
         
-        if (!is.read(reinterpret_cast<char *>(val.data()), vlen))
-            return std::make_error_code(std::errc::io_error);
+        // Unpack the value data if it exists
+        if (!deleted) {
+            val.resize(vlen);
+            if (!is.read(reinterpret_cast<char *>(val.data()), vlen))
+                return std::make_error_code(std::errc::io_error);
+        }
         
         return {};
     }
