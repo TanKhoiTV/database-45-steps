@@ -2,7 +2,7 @@
  * @file database.h
  * @author Tran Van Tan Khoi (tranvantankhoi@gmail.com)
  * @brief A basic in-memory Key-Value database implementation with append-only logging.
- * @version 0.3.0-alpha.5
+ * @version 0.3.0-alpha.6
  * @date 2026-02-20
  * 
  * @copyright Copyright (c) under MIT license, 2026
@@ -185,6 +185,8 @@ class Log {
      * @return error Default-constructed (no error) on success; otherwise an error code describing the failure.
      */
     error Open() {
+        if (fs.is_open()) return {};
+
         // Error handling: File name is a directory instead of file
         if (std::filesystem::exists(filename) && std::filesystem::is_directory(filename))
             return std::make_error_code(std::errc::is_a_directory);
@@ -287,6 +289,7 @@ class KV {
      * @return An error code. 
      */
     error Open() {
+        if (log.fs.is_open()) return {};
         if (error err = log.Open(); err) return err;
 
         mem.clear();
