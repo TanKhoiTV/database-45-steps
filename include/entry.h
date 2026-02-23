@@ -1,4 +1,6 @@
 // entry.h
+#pragma once
+
 #include "types.h"
 #include "db_error.h"
 #include "platform.h"
