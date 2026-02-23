@@ -47,12 +47,4 @@ struct Entry {
      */
     template <Reader R>
     std::pair<DecodeResult, std::error_code> Decode(R &reader);
-    
-    private:
-
-    /** @brief Packs/Loads a 32-bit integer (4 bytes) into a buffer in Little Endian */
-    static void pack_u32(bytes &buf, size_t offset, uint32_t val);
-    
-    /** @brief Unpacks Little Endian bytes from buffer */
-    static uint32_t unpack_u32(std::span<const std::byte, 4> buf);
 };

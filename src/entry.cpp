@@ -10,30 +10,17 @@ Entry::Entry(bytes _key, bytes _val, bool _deleted)
      : key(std::move(_key)), val(std::move(_val)), deleted(_deleted) {}
 
 
-void Entry::pack_u32(bytes &buf, size_t offset, uint32_t val) {
-    if constexpr (std::endian::native != std::endian::little)
-        val = byteswap(val);
-    auto bytes_arr = std::bit_cast<std::array<std::byte, 4>>(val);
-    std::copy(bytes_arr.begin(), bytes_arr.end(), buf.begin() + offset);
-}
-
-uint32_t Entry::unpack_u32(std::span<const std::byte, 4> buf) {
-    auto val = std::bit_cast<uint32_t>(std::array<std::byte, 4>{
-        buf[0], buf[1], buf[2], buf[3]
-    });
-    if constexpr (std::endian::native != std::endian::little)
-        val = byteswap(val);
-    return val;
-}
-
 bytes Entry::Encode() const {
     uint32_t klen = static_cast<uint32_t>(key.size());
     uint32_t vlen = static_cast<uint32_t>(val.size());
 
     bytes buf(HEADER_SIZE + klen + (deleted ? 0 : vlen));
 
-    pack_u32(buf, KLEN_OFFSET, klen);
-    pack_u32(buf, VLEN_OFFSET, vlen);
+    auto klen_bytes = pack_le<uint32_t>(klen);
+    auto vlen_bytes = pack_le<uint32_t>(vlen);
+    std::copy(klen_bytes.begin(), klen_bytes.end(), buf.begin() + KLEN_OFFSET);
+    std::copy(vlen_bytes.begin(), vlen_bytes.end(), buf.begin() + VLEN_OFFSET);
+
     buf[FLAG_OFFSET] = static_cast<std::byte>(deleted ? 1 : 0);
 
     // Copying key and value data
@@ -60,8 +47,8 @@ std::pair<Entry::DecodeResult, std::error_code> Entry::Decode(R &reader) {
         return { Entry::DecodeResult::fail, db_error::truncated_header };
 
     // Unpack the header
-    uint32_t klen = unpack_u32(std::span<const std::byte, 4>(header).subspan<KLEN_OFFSET, 4>());
-    uint32_t vlen = unpack_u32(std::span<const std::byte, 4>(header).subspan<VLEN_OFFSET, 4>());
+    uint32_t klen = unpack_le<uint32_t>(std::span<const std::byte, 4>(header).subspan<KLEN_OFFSET, 4>());
+    uint32_t vlen = unpack_le<uint32_t>(std::span<const std::byte, 4>(header).subspan<VLEN_OFFSET, 4>());
     deleted = (header[FLAG_OFFSET] != std::byte{0});
 
     // Impose data limits
