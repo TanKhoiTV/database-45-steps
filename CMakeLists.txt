@@ -6,6 +6,8 @@ project(kvdb
     LANGUAGES           CXX
 )
 
+enable_testing()
+
 # --- Standard ---
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)     # error if compiler can't do C++20
@@ -88,6 +90,6 @@ if(DOXYGEN)
     add_custom_target(doc
         COMMAND ${DOXYGEN} ${CMAKE_SOURCE_DIR}/Doxyfile
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT {Generating documentation}
+        COMMENT "Generating documentation"
     )
 endif()
