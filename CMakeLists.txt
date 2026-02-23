@@ -53,6 +53,10 @@ find_package(GTest REQUIRED)
 
 add_executable(kv_test test/test_kv.cpp)
 
+target_include_directories(kv_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/test
+)
+
 target_link_libraries(kv_test PRIVATE
     kvdb_lib
     GTest::GTest

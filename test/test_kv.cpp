@@ -1,7 +1,8 @@
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <sstream>
-#include "database.h"
+#include "kv.h"
+#include "test_utils.h"
 
 // Helper to convert string literals to bytes for cleaner tests
 bytes to_bytes(std::string_view s) {
@@ -22,7 +23,7 @@ TEST(KVTest, BasicOperationsAndPersistence) {
     std::filesystem::remove(test_db);
     
     KV kv(test_db);
-    error open_err = kv.Open();
+    auto open_err = kv.Open();
     std::cerr << open_err.message() << std::endl;
     ASSERT_FALSE(open_err);
 
@@ -111,14 +112,13 @@ TEST(EntryTest, EncodeDecode) {
     EXPECT_EQ(ent.Encode(), expected_data);
 
     // Test decode using a stringstream as buffer
-    std::string s_data(reinterpret_cast<const char *>(expected_data.data()), expected_data.size());
-    std::stringstream ss(s_data);
-
+    BufferReader reader{std::span<const std::byte>(expected_data)};
     Entry decoded;
-    error err = decoded.Decode(ss);
+    auto [res1, err1] = decoded.Decode(reader);
 
     EXPECT_EQ(ent, decoded);
-    EXPECT_FALSE(err);
+    EXPECT_FALSE(err1);
+    EXPECT_EQ(res1, Entry::DecodeResult::ok);
 
     // 2. Test deleted entry
     Entry tomb{to_bytes("k2"), {}, true};
@@ -131,9 +131,10 @@ TEST(EntryTest, EncodeDecode) {
 
     EXPECT_EQ(tomb.Encode(), expected_tomb);
 
-    std::string s_tomb(reinterpret_cast<const char *>(expected_tomb.data()), expected_tomb.size());
-    std::stringstream ss_tomb(s_tomb);
+    BufferReader tomb_reader{std::span<const std::byte>(expected_tomb)};
     Entry decoded_tomb;
-    ASSERT_FALSE(decoded_tomb.Decode(ss_tomb));
+    auto [res2, err2] = decoded_tomb.Decode(tomb_reader);
+    EXPECT_FALSE(err2);
     EXPECT_EQ(tomb, decoded_tomb);
+    EXPECT_EQ(res2, Entry::DecodeResult::ok);
 }
