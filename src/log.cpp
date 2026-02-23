@@ -4,7 +4,6 @@
 #include "bit_utils.h"
 #include <filesystem>
 
-explicit Log::Log(std::string fname) : filename(std::move(fname)) {}
 
 static std::error_code write_file_header(FileHandle &fh) {
     std::array<std::byte, log_format::HEADER_SIZE> header;
@@ -27,8 +26,8 @@ static std::error_code read_and_validate_file_header(FileHandle &fh) {
     if (bytes_read < log_format::HEADER_SIZE)
         return db_error::truncated_header;
 
-    uint32_t magic = unpack_le<uint32_t>(std::span<const std::byte, 4>(header).subspan<0, 4>());
-    uint16_t version = unpack_le<uint16_t>(std::span<const std::byte, 2>(header).subspan<4, 2>());
+    uint32_t magic = unpack_le<uint32_t>(std::span<const std::byte>(header).subspan<0, 4>());
+    uint16_t version = unpack_le<uint16_t>(std::span<const std::byte>(header).subspan<4, 2>());
 
     if (magic != log_format::MAGIC)
         return db_error::bad_magic;

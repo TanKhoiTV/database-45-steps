@@ -1,6 +1,5 @@
 #include "kv.h"
 
-explicit KV::KV(const std::string &path) : log(path) {}
 
 std::error_code KV::Open() {
     if (log.is_open()) return {};

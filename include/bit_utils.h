@@ -23,9 +23,9 @@ std::array<std::byte, sizeof(T)> pack_le(T val) {
 
 template <std::integral T>
 T unpack_le(std::span<const std::byte, sizeof(T)> buf) {
-    auto val = std::bit_cast<T>(
-        std::bit_cast<std::array<std::byte, sizeof(T)>>(buf)
-    );
+    std::array<std::byte, sizeof(T)> arr;
+    std::copy(buf.begin(), buf.end(), arr.begin());
+    auto val = std::bit_cast<T>(arr);
     if constexpr (std::endian::native != std::endian::little)
         val = byteswap(val);
     return val;

@@ -5,8 +5,12 @@
 #include "db_error.h"
 #include "platform.h"
 #include "reader.h"
+#include "bit_utils.h"
 #include <cstdint>
 #include <utility>
+#include <span>
+#include <array>
+#include <algorithm>
 
 /**
  * @brief Represents a single database entry for serialization
@@ -60,8 +64,8 @@ struct Entry {
             return { Entry::DecodeResult::fail, db_error::truncated_header };
 
         // Unpack the header
-        uint32_t klen = unpack_le<uint32_t>(std::span<const std::byte, 4>(header).subspan<KLEN_OFFSET, 4>());
-        uint32_t vlen = unpack_le<uint32_t>(std::span<const std::byte, 4>(header).subspan<VLEN_OFFSET, 4>());
+        uint32_t klen = unpack_le<uint32_t>(std::span<const std::byte>(header).subspan<KLEN_OFFSET, 4>());
+        uint32_t vlen = unpack_le<uint32_t>(std::span<const std::byte>(header).subspan<VLEN_OFFSET, 4>());
         deleted = (header[FLAG_OFFSET] != std::byte{0});
 
         // Impose data limits
