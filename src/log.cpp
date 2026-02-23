@@ -1,8 +1,42 @@
 #include "log.h"
+#include "log_format.h"
 #include "db_error.h"
+#include "bit_utils.h"
 #include <filesystem>
 
 explicit Log::Log(std::string fname) : filename(std::move(fname)) {}
+
+static std::error_code write_file_header(FileHandle &fh) {
+    std::array<std::byte, log_format::HEADER_SIZE> header;
+
+    auto magic      = pack_le<uint32_t>(log_format::MAGIC);
+    auto version    = pack_le<uint16_t>(log_format::FORMAT_VERSION);
+
+    std::copy(magic.begin(), magic.end(), header.begin());
+    std::copy(version.begin(), version.end(), header.begin() + 4);
+
+    return platform_write(fh, std::span<const std::byte>(header));
+}
+
+static std::error_code read_and_validate_file_header(FileHandle &fh) {
+    std::array<std::byte, log_format::HEADER_SIZE> header;
+    size_t bytes_read = 0;
+
+    if (auto err = platform_read(fh, std::span<std::byte>(header), bytes_read); err)
+        return err;
+    if (bytes_read < log_format::HEADER_SIZE)
+        return db_error::truncated_header;
+
+    uint32_t magic = unpack_le<uint32_t>(std::span<const std::byte, 4>(header).subspan<0, 4>());
+    uint16_t version = unpack_le<uint16_t>(std::span<const std::byte, 2>(header).subspan<4, 2>());
+
+    if (magic != log_format::MAGIC)
+        return db_error::bad_magic;
+    if (version > log_format::FORMAT_VERSION)
+        return db_error::unsupported_version;
+    
+    return {};
+}
 
 std::error_code Log::Open() {
     if (fh.is_open()) return {};
@@ -11,7 +45,16 @@ std::error_code Log::Open() {
     if (std::filesystem::exists(filename) && std::filesystem::is_directory(filename))
         return make_error_code(std::errc::is_a_directory);
 
-    return platform_open_file(filename, fh);
+    if (auto err = platform_open_file(filename, fh)) return err;
+
+    std::error_code fs_err;
+    auto size = std::filesystem::file_size(filename, fs_err);
+    if (fs_err) return fs_err;
+
+    if (size == 0) return write_file_header(fh);
+
+    if (auto err = platform_seek(fh, 0, SEEK_SET); err) return err;
+    return read_and_validate_file_header(fh);
 }
 
 std::error_code Log::Close() {
