@@ -14,19 +14,19 @@ bytes to_bytes(std::string_view s) {
 
 // Overload for Entry comparison (required for EXPECT_EQ)
 bool operator==(const Entry& a, const Entry& b) {
-    return a.key == b.key && a.val == b.val;
+    return a.key == b.key && a.val == b.val && a.deleted == b.deleted;
 }
 
 
-const std::string test_db = ".test_db";
+const std::string test_db = (std::filesystem::temp_directory_path() / "kvdb_test_db").string();
 
 TEST(KVTest, BasicOperationsAndPersistence) {
     std::filesystem::remove(test_db);
     
     KV kv(test_db);
     auto open_err = kv.Open();
-    std::cerr << open_err.message() << std::endl;
-    ASSERT_FALSE(open_err);
+    dump_file(test_db);
+    ASSERT_FALSE(open_err) << "Failed to open KV: " << open_err.message();
 
     bytes key = to_bytes("conf");
     bytes val1 = to_bytes("v1");
@@ -138,4 +138,12 @@ TEST(EntryTest, EncodeDecode) {
     EXPECT_FALSE(err2);
     EXPECT_EQ(tomb, decoded_tomb);
     EXPECT_EQ(res2, Entry::DecodeResult::ok);
+
+    // 3. Test EOF on empty buffer
+    bytes empty{};
+    BufferReader empty_reader{std::span<const std::byte>(empty)};
+    Entry eof_entry;
+    auto [res3, err3] = eof_entry.Decode(empty_reader);
+    EXPECT_EQ(res3, Entry::DecodeResult::eof);
+    EXPECT_FALSE(err3);
 }

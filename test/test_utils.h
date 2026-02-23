@@ -6,6 +6,8 @@
 #include <cstddef>
 #include <algorithm>
 #include <system_error>
+#include <iomanip>
+#include <fstream>
 
 struct BufferReader {
     std::span<const std::byte> src;
@@ -21,3 +23,15 @@ struct BufferReader {
 };
 
 static_assert(Reader<BufferReader>, "BufferReader must satisfy the Reader concept");
+
+// Debug helper
+void dump_file(const std::string &path) {
+    std::ifstream f(path, std::ios::binary);
+    std::cerr << "File: " << path << " (" 
+              << std::filesystem::file_size(path) << " bytes)\n";
+    int i = 0;
+    for (std::istreambuf_iterator<char> it(f), end; it != end; ++it, ++i)
+        std::cerr << std::hex << std::setw(2) << std::setfill('0') 
+                  << (static_cast<unsigned char>(*it) & 0xFF) << " ";
+    std::cerr << std::dec << "\n";
+}
