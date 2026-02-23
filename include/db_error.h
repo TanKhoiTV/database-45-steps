@@ -14,7 +14,9 @@ enum class db_error {
     truncated_payload,
     key_too_large,
     value_too_large,
-    io_failure
+    io_failure,
+    bad_magic,              // file does not begin with KVDB magic number
+    unsupported_version     // format version is newer than this build supports
 };
 
 /**
@@ -36,6 +38,8 @@ struct DBErrorCategory : std::error_category {
             case db_error::key_too_large:       return "Key size exceeds limit";
             case db_error::value_too_large:     return "Value size exceeds limit";
             case db_error::io_failure:          return "I/O failure";
+            case db_error::bad_magic:           return "File is not a valid kvdb log (magic number mismatch)";
+            case db_error::unsupported_version: return "Log file format version is newer than this build supports";
             default:                            return "Unknown database error";
         }
     }
