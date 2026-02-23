@@ -1,7 +1,6 @@
 #pragma once
 
 #include "log.h"
-#include "entry.h"
 #include "types.h"
 #include <unordered_map>
 #include <optional>
