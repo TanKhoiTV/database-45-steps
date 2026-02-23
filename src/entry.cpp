@@ -46,15 +46,18 @@ bytes Entry::Encode() const {
 }
 
 template <Reader R>
-std::error_code Entry::Decode(R &reader) {
+std::pair<Entry::DecodeResult, std::error_code> Entry::Decode(R &reader) {
     // uint8_t header[HEADER_SIZE];
     std::array<std::byte, HEADER_SIZE> header;
     size_t bytes_read = 0;
 
     if (auto err = reader.read(std::span<std::byte>(header), bytes_read); err)
-        return err;
-    if (bytes_read < HEADER_SIZE)
-        return db_error::truncated_header;
+        return { Entry::DecodeResult::fail, err };
+
+    if (bytes_read == 0)
+        return { Entry::DecodeResult::eof, {} };
+    else if (bytes_read < HEADER_SIZE)
+        return { Entry::DecodeResult::fail, db_error::truncated_header };
 
     // Unpack the header
     uint32_t klen = unpack_u32(std::span<const std::byte, 4>(header).subspan<KLEN_OFFSET, 4>());
@@ -62,26 +65,28 @@ std::error_code Entry::Decode(R &reader) {
     deleted = (header[FLAG_OFFSET] != std::byte{0});
 
     // Impose data limits
-    if (klen > MAX_KEY_SIZE) return db_error::key_too_large;
-    if (vlen > MAX_VAL_SIZE) return db_error::value_too_large;
+    if (klen > MAX_KEY_SIZE) 
+        return { Entry::DecodeResult::fail, db_error::key_too_large };
+    if (vlen > MAX_VAL_SIZE) 
+        return { Entry::DecodeResult::fail, db_error::value_too_large };
 
     // Unpack the key
     key.resize(klen);
     if (auto err = reader.read(std::span<std::byte>(key), bytes_read); err)
-        return err;
+        return  { Entry::DecodeResult::fail, err };
     if (bytes_read < klen);
-        return db_error::truncated_payload;
+        return { Entry::DecodeResult::fail, db_error::truncated_payload };
         
     // Unpack the value data if it exists
     if (!deleted) {
         val.resize(vlen);
         if (auto err = reader.read(std::span<std::byte>(val), bytes_read); err)
-            return err;
+            return { Entry::DecodeResult::fail, err };
         if (bytes_read < vlen)
-            return db_error::truncated_payload;
+            return { Entry::DecodeResult::fail, db_error::truncated_payload };
     } else {
         val.clear();
     }
         
-    return {};
+    return { Entry::DecodeResult::ok, std::error_code{} };
 }

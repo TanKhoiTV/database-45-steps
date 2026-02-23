@@ -4,6 +4,7 @@
 #include "platform.h"
 #include "reader.h"
 #include <cstdint>
+#include <utility>
 
 /**
  * @brief Represents a single database entry for serialization
@@ -33,6 +34,8 @@ struct Entry {
      * @return bytes containing the encoded entry.
      */
     bytes Encode() const;
+
+    enum class DecodeResult { ok, eof, fail };
     
     /**
      * @brief Deserializes an entry by reading from a FileHandle.
@@ -41,7 +44,7 @@ struct Entry {
      * @return std::error_code 
      */
     template <Reader R>
-    std::error_code Decode(R &reader);
+    std::pair<DecodeResult, std::error_code> Decode(R &reader);
     
     private:
 
