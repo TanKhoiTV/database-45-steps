@@ -13,3 +13,20 @@ constexpr T byteswap(T value) noexcept {
     std::ranges::reverse(value_representation);
     return std::bit_cast<T>(value_representation);
 }
+
+template <std::integral T>
+std::array<std::byte, sizeof(T)> pack_le(T val) {
+    if constexpr (std::endian::native != std::endian::little)
+        val = byteswap(val);
+    return std::bit_cast<std::array<std::byte, sizeof(T)>>(val);
+}
+
+template <std::integral T>
+T unpack_le(std::span<const std::byte, sizeof(T)> buf) {
+    auto val = std::bit_cast<T>(
+        std::bit_cast<std::array<std::byte, sizeof(T)>>(buf)
+    );
+    if constexpr (std::endian::native != std::endian::little)
+        val = byteswap(val);
+    return val;
+}
