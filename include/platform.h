@@ -30,6 +30,10 @@ class FileHandle {
     bool is_open()  const noexcept { return fd_ >= 0; }
     bool at_eof()   const noexcept { return at_eof_; }
 
+    std::error_code read(std::span<std::byte> buf, size_t &bytes_read) {
+        return platform_read(*this, buf, bytes_read);
+    }
+
     private:
 
     friend std::error_code platform_open_file(const std::string &path, FileHandle &out);
