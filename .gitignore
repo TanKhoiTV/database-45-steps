@@ -1,8 +1,11 @@
+# VS Code project configurations
+.vscode/
+
 # Doxygen output
-cpp/html/
-cpp/latex/
+html/
+latex/
 
 # Build artifacts
-cpp/kv_test
 
+# Go's code
 db_project+solution/
