@@ -78,6 +78,8 @@ class Log {
      */
     std::pair<ReadResult, std::error_code> Read(Entry &ent);
 
+    std::error_code SeekToStart();
+
     bool is_open() const noexcept { return fh.is_open(); }
 
     ~Log();

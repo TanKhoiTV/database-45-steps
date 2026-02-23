@@ -31,6 +31,10 @@ std::pair<Log::ReadResult, std::error_code> Log::Read(Entry &ent) {
     return { res == Entry::DecodeResult::eof ? Log::ReadResult::eof : Log::ReadResult::ok, {} };
 }
 
+std::error_code Log::SeekToStart() {
+    return platform_seek(fh, 0, SEEK_SET);
+}
+
 Log::~Log() {
     if (fh.is_open()) platform_close(fh);
 }
