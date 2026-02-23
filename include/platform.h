@@ -3,6 +3,7 @@
 #include <system_error>     // std::error_code
 #include <string>           // std::string
 #include <span>             // std::span
+#include "reader.h"
 
 class FileHandle {
     private:
@@ -43,6 +44,8 @@ class FileHandle {
     friend std::error_code platform_sync(FileHandle &fh);
     friend std::error_code platform_close(FileHandle &fh);
 };
+
+static_assert(Reader<FileHandle>, "FileHandle must satisfy the Reader concept");
 
 std::error_code platform_open_file(const std::string &path, FileHandle &out);
 std::error_code platform_write(FileHandle &fh, std::span<const std::byte> buf);
