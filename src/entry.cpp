@@ -12,7 +12,7 @@ Entry::Entry(bytes _key, bytes _val, bool _deleted)
 
 bytes Entry::Encode() const {
     uint32_t klen = static_cast<uint32_t>(key.size());
-    uint32_t vlen = static_cast<uint32_t>(val.size());
+    uint32_t vlen = deleted ? 0 : static_cast<uint32_t>(val.size());
 
     bytes buf(HEADER_SIZE + klen + (deleted ? 0 : vlen));
 
