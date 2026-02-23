@@ -6,6 +6,7 @@ html/
 latex/
 
 # Build artifacts
+build/
 
 # Go's code
 db_project+solution/
