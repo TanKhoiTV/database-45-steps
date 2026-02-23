@@ -3,6 +3,7 @@
 #include <sstream>
 #include "kv.h"
 #include "test_utils.h"
+#include "entry.h"
 
 // Helper to convert string literals to bytes for cleaner tests
 bytes to_bytes(std::string_view s) {
