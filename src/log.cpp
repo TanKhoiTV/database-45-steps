@@ -61,6 +61,8 @@ std::error_code Log::Close() {
 }
 
 std::error_code Log::Write(const Entry &ent) {
+    if (auto err = platform_seek(fh, 0, SEEK_END); err) return err;
+
     bytes data = ent.Encode();
     if (auto err = platform_write(fh, std::span<std::byte>(data)); err)
         return err;
@@ -73,8 +75,8 @@ std::pair<Log::ReadResult, std::error_code> Log::Read(Entry &ent) {
     return { res == Entry::DecodeResult::eof ? Log::ReadResult::eof : Log::ReadResult::ok, {} };
 }
 
-std::error_code Log::SeekToStart() {
-    return platform_seek(fh, 0, SEEK_SET);
+std::error_code Log::SeekToFirstEntry() {
+    return platform_seek(fh, log_format::HEADER_SIZE, SEEK_SET);
 }
 
 Log::~Log() {

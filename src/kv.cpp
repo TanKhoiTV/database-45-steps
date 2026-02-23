@@ -7,7 +7,7 @@ std::error_code KV::Open() {
 
     mem.clear();
 
-    if (auto err = log.SeekToStart(); err) return err;
+    if (auto err = log.SeekToFirstEntry(); err) return err;
 
     Entry ent;
     while (true) {
