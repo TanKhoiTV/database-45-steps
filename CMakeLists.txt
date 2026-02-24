@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(kvdb
-    VERSION             0.5.0
+    VERSION             0.6.0
     DESCRIPTION         "File-backed key-value store with sequential log"
     LANGUAGES           CXX
 )
@@ -9,9 +9,9 @@ project(kvdb
 enable_testing()
 
 # --- Standard ---
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)     # error if compiler can't do C++20
-set(CMAKE_CXX_EXTENSIONS OFF)           # use -std=c++20, not -std=gnu++20
+set(CMAKE_CXX_STANDARD 23)              # C++23 standard
+set(CMAKE_CXX_STANDARD_REQUIRED ON)     # error if compiler can't do C++23
+set(CMAKE_CXX_EXTENSIONS OFF)           # use -std=c++23, not -std=gnu++23
 
 # --- Version header ---
 configure_file(
