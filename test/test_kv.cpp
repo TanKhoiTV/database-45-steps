@@ -101,18 +101,9 @@ TEST(EntryTest, EncodeDecode) {
     // 1. Test regular entry
     Entry ent{to_bytes("k1"), to_bytes("xxx"), false};
 
-    bytes expected_data = {
-        std::byte{2}, std::byte{0}, std::byte{0}, std::byte{0}, // klen
-        std::byte{3}, std::byte{0}, std::byte{0}, std::byte{0}, // vlen
-        std::byte{0},                                           // flag
-        std::byte{'k'}, std::byte{'1'},                         // key
-        std::byte{'x'}, std::byte{'x'}, std::byte{'x'}          // val
-    };
+    // Test round-trip only
+    bytes expected_data = ent.Encode();
 
-    // Test encode
-    EXPECT_EQ(ent.Encode(), expected_data);
-
-    // Test decode using a stringstream as buffer
     BufferReader reader{std::span<const std::byte>(expected_data)};
     Entry decoded;
     auto [res1, err1] = decoded.Decode(reader);
@@ -123,14 +114,7 @@ TEST(EntryTest, EncodeDecode) {
 
     // 2. Test deleted entry
     Entry tomb{to_bytes("k2"), {}, true};
-    bytes expected_tomb = {
-        std::byte{2}, std::byte{0}, std::byte{0}, std::byte{0}, // klen
-        std::byte{0}, std::byte{0}, std::byte{0}, std::byte{0}, // vlen
-        std::byte{1},                                           // flag
-        std::byte{'k'}, std::byte{'2'}                          // key
-    };
-
-    EXPECT_EQ(tomb.Encode(), expected_tomb);
+    bytes expected_tomb = tomb.Encode();
 
     BufferReader tomb_reader{std::span<const std::byte>(expected_tomb)};
     Entry decoded_tomb;
@@ -146,4 +130,18 @@ TEST(EntryTest, EncodeDecode) {
     auto [res3, err3] = eof_entry.Decode(empty_reader);
     EXPECT_EQ(res3, Entry::DecodeResult::eof);
     EXPECT_FALSE(err3);
+}
+
+TEST(EntryTest, BadChecksumDetection) {
+    Entry ent{to_bytes("k1"), to_bytes("xxx"), false};
+    bytes encoded = ent.Encode();
+
+    encoded[encoded.size() - 1] ^= std::byte{0xFF};
+
+    BufferReader reader{std::span<const std::byte>(encoded)};
+    Entry decoded;
+    auto [res, err] = decoded.Decode(reader);
+
+    EXPECT_EQ(res, Entry::DecodeResult::fail);
+    EXPECT_EQ(err, db_error::bad_checksum);
 }

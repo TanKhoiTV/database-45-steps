@@ -29,5 +29,10 @@ bytes Entry::Encode() const {
         std::copy(val.begin(), val.end(), buf.begin() + HEADER_SIZE + klen);
     }
 
+    // Compute the checksum and add to the header
+    uint32_t cksum = crc32_ieee(std::span(buf).subspan<KLEN_OFFSET>());
+    auto cksum_bytes = pack_le<uint32_t>(cksum);
+    std::copy(cksum_bytes.begin(), cksum_bytes.end(), buf.begin() + CKSUM_OFFSET);
+
     return buf;
 }
