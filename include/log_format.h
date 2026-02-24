@@ -16,7 +16,7 @@ namespace log_format {
      * accidental reads of arbitrary binary files
      */
     inline constexpr uint32_t   MAGIC           = 0x4B564442;
-    inline constexpr uint16_t   FORMAT_VERSION  = 1;
+    inline constexpr uint16_t   FORMAT_VERSION  = 2;
 
     inline constexpr size_t     HEADER_SIZE     = 6;
 }
