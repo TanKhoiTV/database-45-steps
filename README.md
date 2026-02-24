@@ -263,7 +263,7 @@ cmake -S . -B build
 
 ### Include hierarchy (low to high)
 
-Already displayed above, but showed again here for convenience.
+Already displayed above, but shown again here for convenience.
 
 ```txt
 types.h   db_error.h   bit_utils.h   reader.h
@@ -308,7 +308,7 @@ All multi-byte integers are little-endian. A `flag` of `1` marks a tombstone (de
 | Version | Date       | Description                                              |
 |---------|------------|----------------------------------------------------------|
 | 0.5.0   | 2026-02-24 | Add integrity checks on every entry.                     |
-| 0.4.0   | 2026-02-23 | Upgrade to C++20 from C++17 with mutil-file refactor.    |
+| 0.4.0   | 2026-02-23 | Upgrade to C++20 from C++17 with multi-file refactor.    |
 | 0.3.0   | 2026-02-22 | Add sequential logging and custom database error codes.  |
 | 0.2.0   | 2026-02-21 | Add entry serialization with binary wire format.         |
 | 0.1.0   | 2026-02-20 | Initial Key-Value in-memory store.                       |
