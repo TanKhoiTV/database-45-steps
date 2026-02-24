@@ -16,7 +16,8 @@ enum class db_error {
     value_too_large,
     io_failure,
     bad_magic,              // file does not begin with KVDB magic number
-    unsupported_version     // format version is newer than this build supports
+    unsupported_version,    // format version is newer than this build supports
+    bad_checksum
 };
 
 /**
@@ -40,6 +41,7 @@ struct DBErrorCategory : std::error_category {
             case db_error::io_failure:          return "I/O failure";
             case db_error::bad_magic:           return "File is not a valid kvdb log (magic number mismatch)";
             case db_error::unsupported_version: return "Log file format version is newer than this build supports";
+            case db_error::bad_checksum:        return "Entry checksum mismatch, data is possibly corrupt";
             default:                            return "Unknown database error";
         }
     }
