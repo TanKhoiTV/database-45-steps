@@ -71,8 +71,17 @@ std::error_code Log::Write(const Entry &ent) {
 
 std::pair<Log::ReadResult, std::error_code> Log::Read(Entry &ent) {
     auto [res, err] = ent.Decode(fh);
+
+    if (res == Entry::DecodeResult::eof)
+        return { ReadResult::eof, {} };
+    
+    // Treat tail corruption as EOF silently, future implementation should have a flag to trigger a warning. 
+    if (err == db_error::bad_checksum || err == db_error::truncated_header || err == db_error::truncated_payload)
+        return { ReadResult::eof, {} };
+
     if (err) return { Log::ReadResult::fail, err };
-    return { res == Entry::DecodeResult::eof ? Log::ReadResult::eof : Log::ReadResult::ok, {} };
+    
+    return { Log::ReadResult::ok, {} };
 }
 
 std::error_code Log::SeekToFirstEntry() {
