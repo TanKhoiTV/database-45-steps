@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(kvdb
-    VERSION             0.4.0
+    VERSION             0.5.0
     DESCRIPTION         "File-backed key-value store with sequential log"
     LANGUAGES           CXX
 )
