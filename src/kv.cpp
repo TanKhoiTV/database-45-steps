@@ -9,17 +9,16 @@ std::error_code KV::Open() {
 
     if (auto err = log.SeekToFirstEntry(); err) return err;
 
-    Entry ent;
     while (true) {
-        auto [res, err] = log.Read(ent);
-        switch (res) {
-            case Log::ReadResult::eof: return {};
-            case Log::ReadResult::fail: return err;
-            case Log::ReadResult::ok:
-                if (ent.deleted) mem.erase(ent.key);
-                else mem[ent.key] = std::move(ent.val);
-                break;
-        }
+        auto result = log.Read();
+        if (!result.has_value())
+            return result.error();
+        if (std::holds_alternative<LogEOF>(result.value()))
+            return {};
+
+        auto &ent = std::get<Entry>(result.value());
+        if (ent.deleted) mem.erase(ent.key);
+        else mem[ent.key] = ent.val;
     }
 
     return {};

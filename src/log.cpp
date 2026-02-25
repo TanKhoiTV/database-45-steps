@@ -33,7 +33,7 @@ static std::error_code read_and_validate_file_header(FileHandle &fh) {
         return db_error::bad_magic;
     if (version > log_format::FORMAT_VERSION)
         return db_error::unsupported_version;
-    
+
     return {};
 }
 
@@ -63,25 +63,33 @@ std::error_code Log::Close() {
 std::error_code Log::Write(const Entry &ent) {
     if (auto err = platform_seek(fh, 0, SEEK_END); err) return err;
 
-    bytes data = ent.Encode();
+    bytes data = EntryCodec::encode(ent);
     if (auto err = platform_write(fh, std::span<std::byte>(data)); err)
         return err;
     return platform_sync(fh);
 }
 
-std::pair<Log::ReadResult, std::error_code> Log::Read(Entry &ent) {
-    auto [res, err] = ent.Decode(fh);
+ReadResult Log::Read() {
+    auto result = EntryCodec::decode(fh);
 
-    if (res == Entry::DecodeResult::eof)
-        return { ReadResult::eof, {} };
-    
-    // Treat tail corruption as EOF silently, future implementation should have a flag to trigger a warning. 
-    if (err == db_error::bad_checksum || err == db_error::truncated_header || err == db_error::truncated_payload)
-        return { ReadResult::eof, {} };
+    // Treat tail corruption as EOF silently, future implementation should have a flag to trigger a warning.
+    if (!result.has_value()) {
+        auto err = result.error();
+        if (err == db_error::bad_checksum || err == db_error::truncated_header || err == db_error::truncated_payload)
+            return LogEOF{};
 
-    if (err) return { Log::ReadResult::fail, err };
-    
-    return { Log::ReadResult::ok, {} };
+        return std::unexpected(err);
+    }
+
+    return std::visit(
+        []<typename T>(T &&val) -> ReadResult {
+            if constexpr (std::is_same_v<std::decay_t<T>, Entry>)
+                return std::forward<T>(val);
+            else
+                return LogEOF{};
+        },
+        std::move(result.value())
+    );
 }
 
 std::error_code Log::SeekToFirstEntry() {

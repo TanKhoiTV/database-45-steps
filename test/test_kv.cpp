@@ -3,7 +3,7 @@
 #include <sstream>
 #include "kv.h"
 #include "test_utils.h"
-#include "entry.h"
+#include "entry_codec.h"
 
 // Helper to convert string literals to bytes for cleaner tests
 bytes to_bytes(std::string_view s) {
@@ -12,17 +12,12 @@ bytes to_bytes(std::string_view s) {
     return b;
 }
 
-// Overload for Entry comparison (required for EXPECT_EQ)
-bool operator==(const Entry& a, const Entry& b) {
-    return a.key == b.key && a.val == b.val && a.deleted == b.deleted;
-}
-
 
 const std::string test_db = (std::filesystem::temp_directory_path() / "kvdb_test_db").string();
 
 TEST(KVTest, BasicOperationsAndPersistence) {
     std::filesystem::remove(test_db);
-    
+
     KV kv(test_db);
     auto open_err = kv.Open();
     dump_file(test_db);
@@ -34,7 +29,7 @@ TEST(KVTest, BasicOperationsAndPersistence) {
 
     // 1. Initial Set (Success, state changed)
     auto [upd1, err1] = kv.Set(key, val1);
-    EXPECT_TRUE(upd1); 
+    EXPECT_TRUE(upd1);
     EXPECT_FALSE(err1);
 
     // 2. Update with different value (Success, state changed)
@@ -91,7 +86,7 @@ TEST(KVTest, BasicOperationsAndPersistence) {
     ASSERT_TRUE(new_r2.has_value());
     EXPECT_EQ(new_r2.value(), new_val);
     EXPECT_FALSE(new_err2);
-    
+
     ASSERT_FALSE(kv.Close());
 
     std::filesystem::remove(test_db);
@@ -102,46 +97,44 @@ TEST(EntryTest, EncodeDecode) {
     Entry ent{to_bytes("k1"), to_bytes("xxx"), false};
 
     // Test round-trip only
-    bytes expected_data = ent.Encode();
+    bytes expected_data = EntryCodec::encode(ent);
 
     BufferReader reader{std::span<const std::byte>(expected_data)};
-    Entry decoded;
-    auto [res1, err1] = decoded.Decode(reader);
+    auto decoded = EntryCodec::decode(reader);
 
-    EXPECT_EQ(ent, decoded);
-    EXPECT_FALSE(err1);
-    EXPECT_EQ(res1, Entry::DecodeResult::ok);
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_TRUE(std::holds_alternative<Entry>(decoded.value()));
+    EXPECT_EQ(std::get<Entry>(decoded.value()), ent);
 
     // 2. Test deleted entry
     Entry tomb{to_bytes("k2"), {}, true};
-    bytes expected_tomb = tomb.Encode();
+    bytes expected_tomb = EntryCodec::encode(tomb);
 
     BufferReader tomb_reader{std::span<const std::byte>(expected_tomb)};
-    Entry decoded_tomb;
-    auto [res2, err2] = decoded_tomb.Decode(tomb_reader);
-    EXPECT_FALSE(err2);
-    EXPECT_EQ(tomb, decoded_tomb);
-    EXPECT_EQ(res2, Entry::DecodeResult::ok);
+    auto decoded_tomb = EntryCodec::decode(tomb_reader);;
+    ASSERT_TRUE(decoded_tomb.has_value());
+    EXPECT_TRUE(std::holds_alternative<Entry>(decoded_tomb.value()));
+    EXPECT_EQ(tomb, std::get<Entry>(decoded_tomb.value()));
+}
 
-    // 3. Test EOF on empty buffer
+TEST(EntryTest, EntryEOF) {
     bytes empty{};
     BufferReader empty_reader{std::span<const std::byte>(empty)};
-    Entry eof_entry;
-    auto [res3, err3] = eof_entry.Decode(empty_reader);
-    EXPECT_EQ(res3, Entry::DecodeResult::eof);
-    EXPECT_FALSE(err3);
+
+    auto result = EntryCodec::decode(empty_reader);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(std::holds_alternative<EntryEOF>(result.value()));
 }
 
 TEST(EntryTest, BadChecksumDetection) {
     Entry ent{to_bytes("k1"), to_bytes("xxx"), false};
-    bytes encoded = ent.Encode();
+    bytes encoded = EntryCodec::encode(ent);
 
-    encoded[encoded.size() - 1] ^= std::byte{0xFF};
+    encoded.back() ^= std::byte{0xFF};
 
     BufferReader reader{std::span<const std::byte>(encoded)};
-    Entry decoded;
-    auto [res, err] = decoded.Decode(reader);
+    auto result = EntryCodec::decode(reader);
 
-    EXPECT_EQ(res, Entry::DecodeResult::fail);
-    EXPECT_EQ(err, db_error::bad_checksum);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), db_error::bad_checksum);
 }

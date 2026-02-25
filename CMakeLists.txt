@@ -22,7 +22,7 @@ configure_file(
 
 # --- Library sources ---
 set(LIB_SOURCES
-    src/entry.cpp
+    src/entry_codec.cpp
     src/log.cpp
     src/kv.cpp
 )
