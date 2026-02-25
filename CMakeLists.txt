@@ -50,8 +50,23 @@ target_compile_options(kvdb_lib PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
+# --- Dependencies ---
+
+include(FetchContent)
+FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.zip
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+set(FETCHCONTENT_QUIET OFF)
+
+FetchContent_MakeAvailable(googletest)
+
+
 # --- Test executable ---
-find_package(GTest REQUIRED)
+# find_package(GTest REQUIRED)
 
 add_executable(kv_test test/test_kv.cpp)
 
@@ -61,8 +76,8 @@ target_include_directories(kv_test PRIVATE
 
 target_link_libraries(kv_test PRIVATE
     kvdb_lib
-    GTest::GTest
-    GTest::Main
+    gtest
+    gtest_main
 )
 
 # Platform-specific linker flags
@@ -73,6 +88,10 @@ endif(UNIX)
 # Register with CTest
 include(GoogleTest)
 gtest_discover_tests(kv_test)
+
+
+find_package(Threads REQUIRED)
+target_link_libraries(kv_test PRIVATE Threads::Threads)
 
 # --- Convenience targets ---
 find_program(VALGRIND valgrind)
