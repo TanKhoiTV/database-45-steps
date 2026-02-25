@@ -4,10 +4,10 @@ Inspired by Trial of Code's [Code a database in 45 steps (Go)](https://trialofco
 
 ## Features
 
-- **C++20**: Uses `std::span`, `std::bit_cast`, `std::endian`, and concepts for type-safe, portable code.
+- **C++23**: Uses modern C++ concepts like `std::span`, `std::bit_cast`, `std::endian`, `std::variant`, `std::expected`, `std::optional`, and many more.
 - **Binary safe**: Raw `std::byte` vectors as keys and values throughout.
 - **Durable writes**: Every `Set` and `Del` call fsyncs to disk before returning, mirroring Go's `os.File.Sync()`.
-- **Platform abstraction**: POSIX and Windows file I/O (to be implemented) are isolated behind a `FileHandle` RAII class and a set of `platform_*` functions, selected at build time.
+- **Platform abstraction**: POSIX and Windows file I/O are isolated behind a `FileHandle` RAII class and a set of `platform_*` functions, selected at build time.
 - **File format versioning**: Log files begin with a magic number and format version header, so format mismatches are detected on open rather than producing silent corruption.
 - **Reader concept**: `Entry::Decode` is generic over any type satisfying the `Reader` concept, enabling in-memory decoding in tests without touching the filesystem.
 - **Doxygen support**: Documented source for automated documentation generation.
@@ -22,7 +22,7 @@ Inspired by Trial of Code's [Code a database in 45 steps (Go)](https://trialofco
 
 ## How It Works
 
-This database stores data in memory while running, and store in a disk when it closes. Sounds simple, but to ensure data integrity, this database is constructed with two principles in mind: **Durability** and **Atomicity**.
+This database stores data in memory while running, and saves to disk when it closes. Sounds simple, but to ensure data integrity, this database is constructed with two principles in mind: **Durability** and **Atomicity**.
 
 Durability means any data that get written to file must reach the disk, the actual storage. It might sound surprising to you though, that writing to a file normally does not guarantee the file will not disappear when a power outage happens _even if_ it happens after all data was successfully written. The database make sure that if data was successfully written, it will not disappear no matter what happens afterwards. _Read more on how the OS cache works_.
 
@@ -61,7 +61,7 @@ After replay the in-memory state is identical to what it was before the program 
 
 ### Durability
 
-After every write, `fsync` is called on the file descriptor. This tells the OS to flush its own internal buffers to the physical storage device. Without `fsync`, the OS might hold the data in memory for seconds before writing it — data that would be lost in a power failure. With `fsync`, each record is durable before `Set` or `Del` returns.
+After every write, `fsync` is called on the file descriptor. This tells the OS to flush its own internal buffers to the physical storage device. Without `fsync`, the OS might hold the data in memory for seconds before writing it, creating potential data loss in a power failure. With `fsync`, each record is durable before `Set` or `Del` returns.
 
 ### Entry wire format
 
@@ -167,7 +167,7 @@ if (err) { /* handle */ }
 
 ### Prerequisites
 
-- GCC 13+ or Clang 16+ with C++20 support.
+- GCC 13+ or Clang 17+ with C++23 support.
 - CMake 3.20+.
 - Google Test (`libgtest-dev`).
 - Doxygen (optional, for documentation).
@@ -237,17 +237,20 @@ kvdb/
 │   ├── db_error.h          # Custom error codes integrated with std::error_code
 │   ├── bit_utils.h         # byteswap, pack_le, unpack_le, crc32 utilities
 │   ├── reader.h            # Reader concept
-│   ├── platform.h          # FileHandle RAII class + platform_* declarations
-│   ├── log_format.h        # On-disk magic number and format version constants
-│   ├── entry.h             # Entry struct: encoding, decoding, wire format
+│   ├── platform.h          # Helper `platform_*` functions and platform-agnostic include.
+│   ├── platform_unix.h     # FileHandle class definition on POSIX (Linux, macOS)
+│   ├── platform_windows.h  # FileHandle class definition on Windows
+│   ├── entry.h             # Entry struct: holds data (key, value, and flag)
+│   ├── entry_codec.h       # Holds Entry serialization format
 │   ├── log.h               # Log: append-only file-backed entry store
+│   ├── log_format.h        # On-disk magic number and format version constants
 │   └── kv.h                # KV: in-memory store backed by Log
 ├── src/
-│   ├── entry.cpp           # Entry::Encode and non-template helpers
+│   ├── entry_codec.cpp     # `EntryCodec::encode()`
 │   ├── log.cpp             # Log::Open, Write, Read, format header I/O
 │   ├── kv.cpp              # KV::Open, Close, Get, Set, Del
 │   ├── platform_unix.cpp   # POSIX implementation (Linux, macOS)
-│   └── platform_windows.cpp # Win32 implementation (currently empty)
+│   └── platform_windows.cpp # Win32 implementation
 └── test/
     ├── test_utils.h        # BufferReader and other test infrastructure
     └── test_kv.cpp         # GoogleTest unit tests
@@ -305,10 +308,11 @@ All multi-byte integers are little-endian. A `flag` of `1` marks a tombstone (de
 
 ## Project History
 
-| Version | Date       | Description                                              |
-|---------|------------|----------------------------------------------------------|
-| 0.5.0   | 2026-02-24 | Add integrity checks on every entry.                     |
-| 0.4.0   | 2026-02-23 | Upgrade to C++20 from C++17 with multi-file refactor.    |
-| 0.3.0   | 2026-02-22 | Add sequential logging and custom database error codes.  |
-| 0.2.0   | 2026-02-21 | Add entry serialization with binary wire format.         |
-| 0.1.0   | 2026-02-20 | Initial Key-Value in-memory store.                       |
+| Version | Date       | Description                                                                                |
+|---------|------------|----------------------------------------------------------                                  |
+| 0.6.0   | 2026-02-25 | Upgrade the platform to C++23 with some internal changes and add Windows support.          |
+| 0.5.0   | 2026-02-24 | Add integrity checks on every entry.                                                       |
+| 0.4.0   | 2026-02-23 | Upgrade to C++20 from C++17 with multi-file refactor and add file syncs for durability.    |
+| 0.3.0   | 2026-02-22 | Add sequential logging and custom database error codes.                                    |
+| 0.2.0   | 2026-02-21 | Add entry serialization with binary wire format.                                           |
+| 0.1.0   | 2026-02-20 | Initial Key-Value in-memory store.                                                         |

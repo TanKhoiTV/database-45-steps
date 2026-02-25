@@ -1,17 +1,18 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(kvdb
-    VERSION             0.5.0
+    VERSION             0.6.0
     DESCRIPTION         "File-backed key-value store with sequential log"
     LANGUAGES           CXX
 )
 
 enable_testing()
+list(APPEND CMAKE_CTEST_ARGUMENTS "--output-on-failure")
 
 # --- Standard ---
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)     # error if compiler can't do C++20
-set(CMAKE_CXX_EXTENSIONS OFF)           # use -std=c++20, not -std=gnu++20
+set(CMAKE_CXX_STANDARD 23)              # C++23 standard
+set(CMAKE_CXX_STANDARD_REQUIRED ON)     # error if compiler can't do C++23
+set(CMAKE_CXX_EXTENSIONS OFF)           # use -std=c++23, not -std=gnu++23
 
 # --- Version header ---
 configure_file(
@@ -21,12 +22,11 @@ configure_file(
 
 # --- Library sources ---
 set(LIB_SOURCES
-    src/entry.cpp
+    src/entry_codec.cpp
     src/log.cpp
     src/kv.cpp
 )
 
-# Platform-specific source
 if(UNIX)
     list(APPEND LIB_SOURCES src/platform_unix.cpp)
 elseif(WIN32)
@@ -36,7 +36,6 @@ else()
 endif()
 
 # --- Build the library ---
-# STATIC: compiled once, linked directly into the test binary
 add_library(kvdb_lib STATIC ${LIB_SOURCES})
 
 target_include_directories(kvdb_lib
@@ -50,9 +49,22 @@ target_compile_options(kvdb_lib PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
-# --- Test executable ---
-find_package(GTest REQUIRED)
+# --- Dependencies ---
+find_package(Threads REQUIRED)
 
+set(FETCHCONTENT_QUIET OFF)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+include(FetchContent)
+FetchContent_Declare(
+    googletest
+    URL      https://github.com/google/googletest/archive/refs/tags/v1.17.0.zip
+    URL_HASH SHA256=40d4ec942217dcc84a9ebe2a68584ada7d4a33a8ee958755763278ea1c5e18ff
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(googletest)
+
+# --- Test executable ---
 add_executable(kv_test test/test_kv.cpp)
 
 target_include_directories(kv_test PRIVATE
@@ -61,16 +73,11 @@ target_include_directories(kv_test PRIVATE
 
 target_link_libraries(kv_test PRIVATE
     kvdb_lib
-    GTest::GTest
-    GTest::Main
+    GTest::gtest
+    GTest::gtest_main
+    Threads::Threads
 )
 
-# Platform-specific linker flags
-if(UNIX)
-    target_link_libraries(kv_test PRIVATE pthread)
-endif(UNIX)
-
-# Register with CTest
 include(GoogleTest)
 gtest_discover_tests(kv_test)
 
@@ -84,7 +91,6 @@ if(VALGRIND)
     )
 endif()
 
-# Doxygen docs
 find_program(DOXYGEN doxygen)
 if(DOXYGEN)
     add_custom_target(doc
