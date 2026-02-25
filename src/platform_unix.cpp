@@ -14,7 +14,7 @@ void FileHandle::swap(FileHandle &other) noexcept {
     std::swap(at_eof_, other.at_eof_);
 }
 
-FileHandle::FileHandle(FileHandle &&other) noexcept : fd_(other.fd_), at_eof_(other.at_eof_) {
+FileHandle::FileHandle(FileHandle &&other) noexcept : fd_(-1), at_eof_(false) {
     this->swap(other);
 }
 
