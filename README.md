@@ -267,8 +267,6 @@ cmake -S . -B build
 
 ### Include hierarchy (low to high)
 
-Already displayed above, but shown again here for convenience.
-
 ```txt
 types.h   db_error.h   bit_utils.h   reader.h
                     ↓
