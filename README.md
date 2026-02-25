@@ -169,14 +169,15 @@ if (err) { /* handle */ }
 
 - GCC 13+ or Clang 17+ with C++23 support.
 - CMake 3.20+.
-- Google Test (`libgtest-dev`).
 - Doxygen (optional, for documentation).
 - Valgrind (optional, for memory checks).
+
+Google Test is needed but already included in CMake, no need to manually download anything.
 
 A bash command to install everything:
 
 ```bash
-sudo apt install build-essential cmake libgtest-dev doxygen valgrind
+sudo apt install build-essential cmake doxygen valgrind
 ```
 
 ### Build and Test
