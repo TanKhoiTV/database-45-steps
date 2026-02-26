@@ -129,7 +129,7 @@ if (auto err = kv.close(); err) {
 }
 ```
 
-### `std::pair<std::optional<bytes>, std::error_code> KV::get(const bytes &key)`
+### `KV::get(key)`
 
 Retrieves the value for `key`. Returns `std::nullopt` if the key does not exist. Never touches the disk and reads from the in-memory map only.
 
@@ -143,7 +143,7 @@ if (val.has_value()) {
 }
 ```
 
-### `std::pair<bool, std::error_code> KV::set(const bytes &key, const bytes &val)`
+### `KV::set(key, val)`
 
 Inserts or updates `key` with `val`. Appends to the log and fsyncs before updating the in-memory map. Returns `true` if the key was newly inserted or its value changed, `false` if the value was identical to what was already stored.
 
@@ -152,7 +152,7 @@ auto [changed, err] = kv.set(to_bytes("username"), to_bytes("aris"));
 if (err) { /* handle */ }
 ```
 
-### `std::pair<bool, std::error_code> KV::del(const bytes &key)`
+### `KV::del(key)`
 
 Removes `key` by appending a tombstone entry. Fsyncs before updating memory. Returns `true` if the key existed and was removed, `false` if the key was not present.
 

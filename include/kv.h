@@ -9,22 +9,22 @@
 
 
 /**
- * @brief A functor allowing `bytes` to be used as keys in hash maps.
- */
-struct ByteVectorHash {
-    size_t operator()(const bytes &v) const noexcept {
-        return std::hash<std::string_view>{}(
-            std::string_view(reinterpret_cast<const char*>(v.data()), v.size())
-        );
-    }
-};
-
-/**
  * @brief KV provides a simple in-memory key-value store with binary support.
  * It tracks state changes for Set and del operations.
  */
 class KV {
     private:
+
+    /**
+     * @brief A functor allowing `bytes` to be used as keys in hash maps.
+     */
+    struct ByteVectorHash {
+        size_t operator()(const bytes &v) const noexcept {
+            return std::hash<std::string_view>{}(
+                std::string_view(reinterpret_cast<const char*>(v.data()), v.size())
+            );
+        }
+    };
 
     Log log;
     std::unordered_map<bytes, bytes, ByteVectorHash> mem;
@@ -57,7 +57,7 @@ class KV {
      * @param key
      * @return `pair<optional<bytes>, error>`. This method returns no error code for now.
      */
-    std::pair<std::optional<bytes>, std::error_code> get(const bytes &key) const;
+    std::pair<std::optional<bytes>, std::error_code> get(std::span<const std::byte> key) const;
 
     /**
      * @brief Inserts or updates a value.
@@ -66,7 +66,7 @@ class KV {
      * @param val
      * @return `true` if the key was newly added or the value was different.
      */
-    std::pair<bool, std::error_code> set(const bytes &key, const bytes &val);
+    std::pair<bool, std::error_code> set(std::span<const std::byte> key, std::span<const std::byte> val);
 
     /**
      * @brief Removes a key from the store.
@@ -74,5 +74,5 @@ class KV {
      * @param key
      * @return `true` if the key existed and was successfully deleted.
      */
-    std::pair<bool, std::error_code> del(const bytes &key);
+    std::pair<bool, std::error_code> del(std::span<const std::byte> key);
 };
