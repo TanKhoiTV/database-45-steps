@@ -22,11 +22,11 @@ using DecodeResult = std::expected<std::variant<Entry, EntryEOF>, std::error_cod
  */
 struct EntryCodec {
     // Header layout constants
-    static constexpr size_t HEADER_SIZE = 13;
     static constexpr size_t CKSUM_OFFSET = 0;
-    static constexpr size_t KLEN_OFFSET = 4;
-    static constexpr size_t VLEN_OFFSET = 8;
-    static constexpr size_t FLAG_OFFSET = 12;
+    static constexpr size_t KLEN_OFFSET = CKSUM_OFFSET + 4;
+    static constexpr size_t VLEN_OFFSET = KLEN_OFFSET + 4;
+    static constexpr size_t FLAG_OFFSET = VLEN_OFFSET + 4;
+    static constexpr size_t HEADER_SIZE = FLAG_OFFSET + 1;
 
     // Safety Limits
     static constexpr size_t MAX_KEY_SIZE = 1024;            // 1 KB limit
