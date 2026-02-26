@@ -18,64 +18,55 @@ TEST(KVTest, BasicOperations) {
     bytes val2 = to_bytes("v2");
 
     // 1. Initial Set (Success, state changed)
-    auto [upd1, err1] = kv.set(key, val1);
+    auto upd1 = kv.set(key, val1);
     EXPECT_TRUE(upd1);
-    EXPECT_FALSE(err1);
 
     // 2. Update with different value (Success, state changed)
-    auto [upd2, err2] = kv.set(key, val2);
+    auto upd2 = kv.set(key, val2);
     EXPECT_TRUE(upd2); // Returns true because val2 != val1
-    EXPECT_FALSE(err2);
 
     // 3. Update with identical value (Unsuccessful update, state unchanged)
-    auto [upd3, err3] = kv.set(key, val2);
-    EXPECT_FALSE(upd3); // Returns false because value is the same
-    EXPECT_FALSE(err3);
+    auto upd3 = kv.set(key, val2);
+    ASSERT_TRUE(upd3.has_value());
+    EXPECT_FALSE(upd3.value()); // Returns false because value is the same
 
     // 4. Test Get success
-    auto [g1, g_err1] = kv.get(key);
+    auto g1 = kv.get(key);
     ASSERT_TRUE(g1.has_value());
     EXPECT_EQ(g1.value(), val2);
-    EXPECT_FALSE(g_err1);
 
     // 5. Test Get missing
-    auto [g2, g_err2] = kv.get(to_bytes("xxx"));
-    EXPECT_FALSE(g2.has_value());
-    EXPECT_FALSE(g_err2);
+    auto g2 = kv.get(to_bytes("xxx"));
+    EXPECT_TRUE(g2 && !(*g2));
 
     // 6. Test del missing
-    auto [d1, d_err1] = kv.del(to_bytes("xxx"));
-    EXPECT_FALSE(d1);
-    EXPECT_FALSE(d_err1);
+    auto del1 = kv.del(to_bytes("xxx"));
+    EXPECT_FALSE(del1.value());
 
     // 7. Test del success
-    auto [d2, d_err2] = kv.del(key);
-    EXPECT_TRUE(d2);
-    EXPECT_FALSE(d_err2);
+    auto del2 = kv.del(key);
+    EXPECT_TRUE(del2.value());
 
     // Verify final state remains correct
-    auto [res, err4] = kv.get(key);
-    EXPECT_FALSE(res.has_value());
+    auto final = kv.get(key);
+    EXPECT_TRUE(final.has_value());
 
     // Add another key before the last test
     bytes new_key = to_bytes("new key");
     bytes new_val = to_bytes("new val");
-    auto [upd4, s_err] = kv.set(new_key, new_val);
-    ASSERT_TRUE(upd4);
-    ASSERT_FALSE(s_err);
+    auto upd4 = kv.set(new_key, new_val);
+    ASSERT_TRUE(upd4.has_value());
 
     // --- Persistence TEST ---
     ASSERT_FALSE(kv.close());
     ASSERT_FALSE(kv.open());
 
-    auto [new_r1, new_err1] = kv.get(key);
-    EXPECT_FALSE(new_r1.has_value());
-    EXPECT_FALSE(new_err1);
+    auto new_r1 = kv.get(key);
+    EXPECT_FALSE(new_r1.value());
 
-    auto [new_r2, new_err2] = kv.get(new_key);
+    auto new_r2 = kv.get(new_key);
     ASSERT_TRUE(new_r2.has_value());
     EXPECT_EQ(new_r2.value(), new_val);
-    EXPECT_FALSE(new_err2);
 
     ASSERT_FALSE(kv.close());
 
@@ -93,51 +84,29 @@ TEST(KVTest, UpdateMode) {
     bytes val1 = to_bytes("v1");
     bytes val2 = to_bytes("v2");
 
-    {
-        auto [updated, err] = kv.set(key, val1, KV::UpdateMode::Update);
-        EXPECT_FALSE(err);
-        EXPECT_FALSE(updated);
-    }
+    auto updated = kv.set(key, val1, KV::UpdateMode::Update);
+    EXPECT_FALSE(updated.value());
 
-    {
-        auto [updated, err] = kv.set(key, val1, KV::UpdateMode::Insert);
-        EXPECT_FALSE(err);
-        EXPECT_TRUE(updated);
-    }
+    updated = kv.set(key, val1, KV::UpdateMode::Insert);
+    EXPECT_TRUE(updated.value());
 
-    {
-        auto [updated, err] = kv.set(key, val2, KV::UpdateMode::Insert);
-        EXPECT_FALSE(err);
-        EXPECT_FALSE(updated);
-    }
+    updated = kv.set(key, val2, KV::UpdateMode::Insert);
+    EXPECT_FALSE(updated.value());
 
-    {
-        auto [updated, err] = kv.set(key, val2, KV::UpdateMode::Update);
-        EXPECT_FALSE(err);
-        EXPECT_TRUE(updated);
-    }
+    updated = kv.set(key, val2, KV::UpdateMode::Update);
+    EXPECT_TRUE(updated.value());
 
-    auto [del, del_err] = kv.del(key);
+    auto del = kv.del(key);
     EXPECT_TRUE(del);
-    ASSERT_FALSE(del_err);
 
-    {
-        auto [updated, err] = kv.set(key, val1, KV::UpdateMode::Upsert);
-        EXPECT_FALSE(err);
-        EXPECT_TRUE(updated);
-    }
+    updated = kv.set(key, val1, KV::UpdateMode::Upsert);
+    EXPECT_TRUE(updated.value());
 
-    {
-        auto [updated, err] = kv.set(key, val1, KV::UpdateMode::Upsert);
-        EXPECT_FALSE(err);
-        EXPECT_FALSE(updated);
-    }
+    updated = kv.set(key, val1, KV::UpdateMode::Upsert);
+    EXPECT_FALSE(updated.value());
 
-    {
-        auto [updated, err] = kv.set(key, val2, KV::UpdateMode::Upsert);
-        EXPECT_FALSE(err);
-        EXPECT_TRUE(updated);
-    }
+    updated = kv.set(key, val2, KV::UpdateMode::Upsert);
+    EXPECT_TRUE(updated.value());
 
     ASSERT_FALSE(kv.close());
 
@@ -152,16 +121,11 @@ TEST(KVTest, Recovery) {
         auto open_err = kv.open();
         ASSERT_FALSE(open_err) << "Failed to open KV: " << open_err.message();
 
-        {
-            auto [updated, err] = kv.set(to_bytes("k1"), to_bytes("v1"));
-            ASSERT_TRUE(updated);
-            ASSERT_FALSE(err);
-        }
-        {
-            auto [updated, err] = kv.set(to_bytes("k2"), to_bytes("v2"));
-            ASSERT_TRUE(updated);
-            ASSERT_FALSE(err);
-        }
+        auto updated = kv.set(to_bytes("k1"), to_bytes("v1"));
+        ASSERT_TRUE(updated.value());
+
+        updated = kv.set(to_bytes("k2"), to_bytes("v2"));
+        ASSERT_TRUE(updated.value());
 
         kv.close();
     };
@@ -174,12 +138,12 @@ TEST(KVTest, Recovery) {
 
         ASSERT_FALSE(kv.open());
 
-        auto [val1, err1] = kv.get(to_bytes("k1"));
-        ASSERT_TRUE(val1.has_value());
-        EXPECT_EQ(std::string(reinterpret_cast<const char *>(val1->data()), val1->size()), "v1");
+        auto val1 = kv.get(to_bytes("k1"));
+        ASSERT_TRUE(val1.value());
+        EXPECT_EQ(std::string(reinterpret_cast<const char *>((*val1)->data()), (*val1)->size()), "v1");
 
-        auto [val2, err2] = kv.get(to_bytes("k2"));
-        ASSERT_FALSE(val2.has_value());
+        auto val2 = kv.get(to_bytes("k2"));
+        ASSERT_FALSE(val2.value());
     }
     ASSERT_FALSE(kv.close());
 
@@ -193,12 +157,12 @@ TEST(KVTest, Recovery) {
 
         ASSERT_FALSE(kv.open());
 
-        auto [val1, err1] = kv.get(to_bytes("k1"));
-        ASSERT_TRUE(val1.has_value());
-        EXPECT_EQ(std::string(reinterpret_cast<const char *>(val1->data()), val1->size()), "v1");
+        auto val1 = kv.get(to_bytes("k1"));
+        ASSERT_TRUE(val1.value());
+        EXPECT_EQ(std::string(reinterpret_cast<const char *>((*val1)->data()), (*val1)->size()), "v1");
 
-        auto [val2, err2] = kv.get(to_bytes("k2"));
-        ASSERT_FALSE(val2.has_value());
+        auto val2 = kv.get(to_bytes("k2"));
+        ASSERT_FALSE(val2.value());
     }
     ASSERT_FALSE(kv.close());
 

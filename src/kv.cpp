@@ -26,13 +26,13 @@ std::error_code KV::open() {
 
 std::error_code KV::close() { return log.close(); }
 
-std::pair<std::optional<bytes>, std::error_code> KV::get(std::span<const std::byte> key) const {
+std::expected<std::optional<bytes>, std::error_code> KV::get(std::span<const std::byte> key) const {
     auto it = mem.find(to_bytes(key));
-    if (it == mem.end()) return { std::nullopt, {} };
-    return { it->second, {} };
+    if (it == mem.end()) return std::nullopt;
+    return it->second;
 }
 
-std::pair<bool, std::error_code> KV::set(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode) {
+std::expected<bool, std::error_code> KV::set(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode) {
     auto my_key = to_bytes(key);
     auto my_val = to_bytes(val);
 
@@ -46,26 +46,24 @@ std::pair<bool, std::error_code> KV::set(std::span<const std::byte> key, std::sp
         case UpdateMode::Update: updated = exist && (it->second != my_val); break;
     }
 
-    if (!updated) {
-        return { false, {} };
-    }
+    if (!updated) return false;
 
     if (auto err = log.write(Entry(my_key, my_val, false)); err) {
-        return { false, err };
+        return std::unexpected(err);
     }
     mem.insert_or_assign(my_key, my_val);
-    return { updated, {} };
+    return updated;
 }
 
-std::pair<bool, std::error_code> KV::del(std::span<const std::byte> key) {
+std::expected<bool, std::error_code> KV::del(std::span<const std::byte> key) {
     auto my_key = to_bytes(key);
     auto it = mem.find(my_key);
 
     if (it == mem.end()) {
-        return { false, {} };
+        return false;
     }
     if (auto err = log.write(Entry(my_key, {}, true)); err)
-        return { false, err };
+        return std::unexpected(err);
     mem.erase(it);
-    return { true, {} };
+    return true;
 }

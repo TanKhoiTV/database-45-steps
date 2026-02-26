@@ -3,6 +3,7 @@
 #include "log.h"
 #include "types.h"
 #include <unordered_map>
+#include <expected>
 #include <optional>
 #include <system_error>
 #include <utility>
@@ -55,9 +56,9 @@ class KV {
      * @brief Retrieves a value by key.
      * Returns a pair containing the value (if found) and an error code.
      * @param key
-     * @return `pair<optional<bytes>, error>`. This method returns no error code for now.
+     * @return `bytes` if the key exists; `std::nullopt` otherwise.
      */
-    std::pair<std::optional<bytes>, std::error_code> get(std::span<const std::byte> key) const;
+    std::expected<std::optional<bytes>, std::error_code> get(std::span<const std::byte> key) const;
 
     enum class UpdateMode {
         Upsert,
@@ -70,9 +71,9 @@ class KV {
      *
      * @param key
      * @param val
-     * @return `true` if the key was newly added or the value was different.
+     * @return `true` if changes are made, depending on the `UpdateMode`.
      */
-    std::pair<bool, std::error_code> set(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode = UpdateMode::Upsert);
+    std::expected<bool, std::error_code> set(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode = UpdateMode::Upsert);
 
     /**
      * @brief Removes a key from the store.
@@ -80,5 +81,5 @@ class KV {
      * @param key
      * @return `true` if the key existed and was successfully deleted.
      */
-    std::pair<bool, std::error_code> del(std::span<const std::byte> key);
+    std::expected<bool, std::error_code> del(std::span<const std::byte> key);
 };
