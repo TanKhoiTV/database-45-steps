@@ -129,36 +129,49 @@ if (auto err = kv.close(); err) {
 }
 ```
 
-### `KV::get(key)`
+### `std::expected<std::optional<bytes>, std::error_code> KV::get(key)`
 
 Retrieves the value for `key`. Returns `std::nullopt` if the key does not exist. Never touches the disk and reads from the in-memory map only.
 
+**Note**: If you are unfamiliar with `std::expected` and `std::optional`, check the documentation for proper handling of these types.
+
 ```cpp
-auto [val, err] = kv.get(to_bytes("username"));
-if (err) { /* handle */ }
-if (val.has_value()) {
-    // key exists
-} else {
-    // key not found
+auto result = kv.get(to_bytes("username"));
+// Layer 1: Check for System/IO Errors
+if (!result) {
+    std::error_code ec = result.error();
+    // Handle database failure (e.g., file corruption, disk full)
+    return;
 }
+
+// Layer 2: Check if the Key Exists
+auto& opt = *result; // Safe to dereference now
+if (!opt) {
+    // Handle "Key Not Found" (Logic is fine, data is missing)
+    return;
+}
+
+// Success: Use the data
+const bytes& data = *opt;
+process(data);
 ```
 
-### `KV::set(key, val)`
+### `std::expected<bool, std::error_code> KV::set(key, val, KV::UpdateMode)`
 
-Inserts or updates `key` with `val`. Appends to the log and fsyncs before updating the in-memory map. Returns `true` if the key was newly inserted or its value changed, `false` if the value was identical to what was already stored.
+Inserts or updates `key` with `val`. Appends to the log and fsyncs before updating the in-memory map. Returns `true` if any modification is made, `false` if otherwise.
 
 ```cpp
-auto [changed, err] = kv.set(to_bytes("username"), to_bytes("aris"));
-if (err) { /* handle */ }
+auto result = kv.set(to_bytes("username"), to_bytes("aris"));
+if (!result) { /* handle */ }
 ```
 
-### `KV::del(key)`
+### `std::expected<bool, st::erorKV::del(key)`
 
 Removes `key` by appending a tombstone entry. Fsyncs before updating memory. Returns `true` if the key existed and was removed, `false` if the key was not present.
 
 ```cpp
-auto [existed, err] = kv.del(to_bytes("username"));
-if (err) { /* handle */ }
+auto result = kv.del(to_bytes("username"));
+if (!result) { /* handle */ }
 ```
 
 ---
@@ -309,6 +322,7 @@ All multi-byte integers are little-endian. A `flag` of `1` marks a tombstone (de
 
 | Version | Date       | Description                                                                                |
 |---------|------------|----------------------------------------------------------                                  |
+| 0.7.0   | 2026-02-26 | Update KV methods: change return types to `std::expected` and add Set's `UpdateMode`       |
 | 0.6.0   | 2026-02-25 | Upgrade the platform to C++23 with some internal changes and add Windows support.          |
 | 0.5.0   | 2026-02-24 | Add integrity checks on every entry.                                                       |
 | 0.4.0   | 2026-02-23 | Upgrade to C++20 from C++17 with multi-file refactor and add file syncs for durability.    |
