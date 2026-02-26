@@ -29,7 +29,7 @@ class Log {
      *
      * @param fname Path to the log file. The path is stored by value.
      *
-     * The constructor does not open the file; call `Open()` to create/open the underlying file stream.
+     * The constructor does not open the file; call `open()` to create/open the underlying file stream.
      */
     explicit Log(std::string fname) : filename(std::move(fname)) {}
 
@@ -38,7 +38,7 @@ class Log {
 
 
     /**
-     * @brief Open the log file for appending and reading.
+     * @brief open the log file for appending and reading.
      *
      * Perform these checks/steps:
      *
@@ -52,14 +52,14 @@ class Log {
      *
      * @return error Default-constructed (no error) on success; otherwise an error code describing the failure.
      */
-    std::error_code Open();
+    std::error_code open();
 
     /**
-     * @brief Close the underlying file stream.
+     * @brief close the underlying file stream.
      *
      * @return error No error on success; `io_error` otherwise.
      */
-    std::error_code Close();
+    std::error_code close();
 
     /**
      * @brief Append an encoded Entry to the log file
@@ -69,7 +69,7 @@ class Log {
      * @note The method assumes the file stream is opened.
      * Behavior is undefined or an I/O error is triggered if called on a closed stream.
      */
-    std::error_code Write(const Entry &ent);
+    std::error_code write(const Entry &ent);
 
     /**
      * @brief Read and decode the next entry from the file stream.
@@ -77,9 +77,9 @@ class Log {
      * @param[out] ent Entry object to be populated with decoded data.
      * @return `std::pair<bool, error>` The boolean signifies EOF in which case no error is returned.
      */
-    ReadResult Read();
+    ReadResult read();
 
-    std::error_code SeekToFirstEntry();
+    std::error_code seek_to_first_entry();
 
     bool is_open() const noexcept { return fh.is_open(); }
 

@@ -109,32 +109,32 @@ Constructs a KV instance for the log file at `path`. Does not open the file.
 KV kv("/var/data/mydb.kvlog");
 ```
 
-### `std::error_code KV::Open()`
+### `std::error_code KV::open()`
 
 Opens or creates the log file and replays it to rebuild in-memory state. Must be called before any other operation. Safe to call on an already-open instance and returns immediately without re-replaying.
 
 ```cpp
-if (auto err = kv.Open(); err) {
+if (auto err = kv.open(); err) {
     std::cerr << "open failed: " << err.message() << "\n";
 }
 ```
 
-### `std::error_code KV::Close()`
+### `std::error_code KV::close()`
 
 Closes the underlying file handle. The destructor closes silently if this is not called, but calling it explicitly lets you observe and handle close errors.
 
 ```cpp
-if (auto err = kv.Close(); err) {
+if (auto err = kv.close(); err) {
     std::cerr << "close failed: " << err.message() << "\n";
 }
 ```
 
-### `std::pair<std::optional<bytes>, std::error_code> KV::Get(const bytes &key)`
+### `std::pair<std::optional<bytes>, std::error_code> KV::get(const bytes &key)`
 
 Retrieves the value for `key`. Returns `std::nullopt` if the key does not exist. Never touches the disk and reads from the in-memory map only.
 
 ```cpp
-auto [val, err] = kv.Get(to_bytes("username"));
+auto [val, err] = kv.get(to_bytes("username"));
 if (err) { /* handle */ }
 if (val.has_value()) {
     // key exists
@@ -143,21 +143,21 @@ if (val.has_value()) {
 }
 ```
 
-### `std::pair<bool, std::error_code> KV::Set(const bytes &key, const bytes &val)`
+### `std::pair<bool, std::error_code> KV::set(const bytes &key, const bytes &val)`
 
 Inserts or updates `key` with `val`. Appends to the log and fsyncs before updating the in-memory map. Returns `true` if the key was newly inserted or its value changed, `false` if the value was identical to what was already stored.
 
 ```cpp
-auto [changed, err] = kv.Set(to_bytes("username"), to_bytes("aris"));
+auto [changed, err] = kv.set(to_bytes("username"), to_bytes("aris"));
 if (err) { /* handle */ }
 ```
 
-### `std::pair<bool, std::error_code> KV::Del(const bytes &key)`
+### `std::pair<bool, std::error_code> KV::del(const bytes &key)`
 
 Removes `key` by appending a tombstone entry. Fsyncs before updating memory. Returns `true` if the key existed and was removed, `false` if the key was not present.
 
 ```cpp
-auto [existed, err] = kv.Del(to_bytes("username"));
+auto [existed, err] = kv.del(to_bytes("username"));
 if (err) { /* handle */ }
 ```
 

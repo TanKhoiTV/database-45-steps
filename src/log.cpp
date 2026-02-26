@@ -37,7 +37,7 @@ static std::error_code read_and_validate_file_header(FileHandle &fh) {
     return {};
 }
 
-std::error_code Log::Open() {
+std::error_code Log::open() {
     if (fh.is_open()) return {};
 
     // Error handling: File name is a directory instead of file
@@ -56,11 +56,11 @@ std::error_code Log::Open() {
     return read_and_validate_file_header(fh);
 }
 
-std::error_code Log::Close() {
+std::error_code Log::close() {
     return platform_close(fh);
 }
 
-std::error_code Log::Write(const Entry &ent) {
+std::error_code Log::write(const Entry &ent) {
     if (auto err = platform_seek(fh, 0, SEEK_END); err) return err;
 
     bytes data = EntryCodec::encode(ent);
@@ -69,7 +69,7 @@ std::error_code Log::Write(const Entry &ent) {
     return platform_sync(fh);
 }
 
-ReadResult Log::Read() {
+ReadResult Log::read() {
     auto result = EntryCodec::decode(fh);
 
     // Treat tail corruption as EOF silently, future implementation should have a flag to trigger a warning.
@@ -92,7 +92,7 @@ ReadResult Log::Read() {
     );
 }
 
-std::error_code Log::SeekToFirstEntry() {
+std::error_code Log::seek_to_first_entry() {
     return platform_seek(fh, log_format::HEADER_SIZE, SEEK_SET);
 }
 

@@ -19,7 +19,7 @@ TEST(KVTest, BasicOperationsAndPersistence) {
     std::filesystem::remove(test_db);
 
     KV kv(test_db);
-    auto open_err = kv.Open();
+    auto open_err = kv.open();
     dump_file(test_db);
     ASSERT_FALSE(open_err) << "Failed to open KV: " << open_err.message();
 
@@ -28,66 +28,66 @@ TEST(KVTest, BasicOperationsAndPersistence) {
     bytes val2 = to_bytes("v2");
 
     // 1. Initial Set (Success, state changed)
-    auto [upd1, err1] = kv.Set(key, val1);
+    auto [upd1, err1] = kv.set(key, val1);
     EXPECT_TRUE(upd1);
     EXPECT_FALSE(err1);
 
     // 2. Update with different value (Success, state changed)
-    auto [upd2, err2] = kv.Set(key, val2);
+    auto [upd2, err2] = kv.set(key, val2);
     EXPECT_TRUE(upd2); // Returns true because val2 != val1
     EXPECT_FALSE(err2);
 
     // 3. Update with identical value (Unsuccessful update, state unchanged)
-    auto [upd3, err3] = kv.Set(key, val2);
+    auto [upd3, err3] = kv.set(key, val2);
     EXPECT_FALSE(upd3); // Returns false because value is the same
     EXPECT_FALSE(err3);
 
     // 4. Test Get success
-    auto [g1, g_err1] = kv.Get(key);
+    auto [g1, g_err1] = kv.get(key);
     ASSERT_TRUE(g1.has_value());
     EXPECT_EQ(g1.value(), val2);
     EXPECT_FALSE(g_err1);
 
     // 5. Test Get missing
-    auto [g2, g_err2] = kv.Get(to_bytes("xxx"));
+    auto [g2, g_err2] = kv.get(to_bytes("xxx"));
     EXPECT_FALSE(g2.has_value());
     EXPECT_FALSE(g_err2);
 
-    // 6. Test Del missing
-    auto [d1, d_err1] = kv.Del(to_bytes("xxx"));
+    // 6. Test del missing
+    auto [d1, d_err1] = kv.del(to_bytes("xxx"));
     EXPECT_FALSE(d1);
     EXPECT_FALSE(d_err1);
 
-    // 7. Test Del success
-    auto [d2, d_err2] = kv.Del(key);
+    // 7. Test del success
+    auto [d2, d_err2] = kv.del(key);
     EXPECT_TRUE(d2);
     EXPECT_FALSE(d_err2);
 
     // Verify final state remains correct
-    auto [res, err4] = kv.Get(key);
+    auto [res, err4] = kv.get(key);
     EXPECT_FALSE(res.has_value());
 
     // Add another key before the last test
     bytes new_key = to_bytes("new key");
     bytes new_val = to_bytes("new val");
-    auto [upd4, s_err] = kv.Set(new_key, new_val);
+    auto [upd4, s_err] = kv.set(new_key, new_val);
     ASSERT_TRUE(upd4);
     ASSERT_FALSE(s_err);
 
     // --- Persistence TEST ---
-    ASSERT_FALSE(kv.Close());
-    ASSERT_FALSE(kv.Open());
+    ASSERT_FALSE(kv.close());
+    ASSERT_FALSE(kv.open());
 
-    auto [new_r1, new_err1] = kv.Get(key);
+    auto [new_r1, new_err1] = kv.get(key);
     EXPECT_FALSE(new_r1.has_value());
     EXPECT_FALSE(new_err1);
 
-    auto [new_r2, new_err2] = kv.Get(new_key);
+    auto [new_r2, new_err2] = kv.get(new_key);
     ASSERT_TRUE(new_r2.has_value());
     EXPECT_EQ(new_r2.value(), new_val);
     EXPECT_FALSE(new_err2);
 
-    ASSERT_FALSE(kv.Close());
+    ASSERT_FALSE(kv.close());
 
     std::filesystem::remove(test_db);
 }

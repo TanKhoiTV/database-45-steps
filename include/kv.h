@@ -21,7 +21,7 @@ struct ByteVectorHash {
 
 /**
  * @brief KV provides a simple in-memory key-value store with binary support.
- * It tracks state changes for Set and Del operations.
+ * It tracks state changes for Set and del operations.
  */
 class KV {
     private:
@@ -40,39 +40,39 @@ class KV {
     /**
      * @brief Clears any existing in-memory data.
      * Then reads from the internal log to initialize the database.
-     * @return An error code. 
+     * @return An error code.
      */
-    std::error_code Open();
+    std::error_code open();
 
     /**
      * @brief Closes the database.
-     * 
+     *
      * @return An error code (if there's any).
      */
-    std::error_code Close();
+    std::error_code close();
 
     /**
      * @brief Retrieves a value by key.
      * Returns a pair containing the value (if found) and an error code.
-     * @param key 
-     * @return `pair<optional<bytes>, error>`. This method returns no error code for now. 
+     * @param key
+     * @return `pair<optional<bytes>, error>`. This method returns no error code for now.
      */
-    std::pair<std::optional<bytes>, std::error_code> Get(const bytes &key) const;
+    std::pair<std::optional<bytes>, std::error_code> get(const bytes &key) const;
 
     /**
      * @brief Inserts or updates a value.
-     * 
-     * @param key 
-     * @param val 
+     *
+     * @param key
+     * @param val
      * @return `true` if the key was newly added or the value was different.
      */
-    std::pair<bool, std::error_code> Set(const bytes &key, const bytes &val);
+    std::pair<bool, std::error_code> set(const bytes &key, const bytes &val);
 
     /**
      * @brief Removes a key from the store.
-     * 
-     * @param key 
+     *
+     * @param key
      * @return `true` if the key existed and was successfully deleted.
      */
-    std::pair<bool, std::error_code> Del(const bytes &key);
+    std::pair<bool, std::error_code> del(const bytes &key);
 };
