@@ -3,24 +3,14 @@
 #include <sstream>
 #include "kv.h"
 #include "test_utils.h"
-#include "entry_codec.h"
-
-// Helper to convert string literals to bytes for cleaner tests
-bytes to_bytes(std::string_view s) {
-    bytes b;
-    for (char c : s) b.push_back(static_cast<std::byte>(c));
-    return b;
-}
-
 
 const std::string test_db = (std::filesystem::temp_directory_path() / "kvdb_test_db").string();
 
-TEST(KVTest, BasicOperationsAndPersistence) {
+TEST(KVTest, BasicOperations) {
     std::filesystem::remove(test_db);
 
     KV kv(test_db);
     auto open_err = kv.open();
-    dump_file(test_db);
     ASSERT_FALSE(open_err) << "Failed to open KV: " << open_err.message();
 
     bytes key = to_bytes("conf");
@@ -92,49 +82,125 @@ TEST(KVTest, BasicOperationsAndPersistence) {
     std::filesystem::remove(test_db);
 }
 
-TEST(EntryTest, EncodeDecode) {
-    // 1. Test regular entry
-    Entry ent{to_bytes("k1"), to_bytes("xxx"), false};
+TEST(KVTest, UpdateMode) {
+    std::filesystem::remove(test_db);
 
-    // Test round-trip only
-    bytes expected_data = EntryCodec::encode(ent);
+    KV kv(test_db);
+    auto open_err = kv.open();
+    ASSERT_FALSE(open_err) << "Failed to open KV: " << open_err.message();
 
-    BufferReader reader{std::span<const std::byte>(expected_data)};
-    auto decoded = EntryCodec::decode(reader);
+    bytes key = to_bytes("conf");
+    bytes val1 = to_bytes("v1");
+    bytes val2 = to_bytes("v2");
 
-    ASSERT_TRUE(decoded.has_value());
-    EXPECT_TRUE(std::holds_alternative<Entry>(decoded.value()));
-    EXPECT_EQ(std::get<Entry>(decoded.value()), ent);
+    {
+        auto [updated, err] = kv.set(key, val1, KV::UpdateMode::Update);
+        EXPECT_FALSE(err);
+        EXPECT_FALSE(updated);
+    }
 
-    // 2. Test deleted entry
-    Entry tomb{to_bytes("k2"), {}, true};
-    bytes expected_tomb = EntryCodec::encode(tomb);
+    {
+        auto [updated, err] = kv.set(key, val1, KV::UpdateMode::Insert);
+        EXPECT_FALSE(err);
+        EXPECT_TRUE(updated);
+    }
 
-    BufferReader tomb_reader{std::span<const std::byte>(expected_tomb)};
-    auto decoded_tomb = EntryCodec::decode(tomb_reader);;
-    ASSERT_TRUE(decoded_tomb.has_value());
-    EXPECT_TRUE(std::holds_alternative<Entry>(decoded_tomb.value()));
-    EXPECT_EQ(tomb, std::get<Entry>(decoded_tomb.value()));
+    {
+        auto [updated, err] = kv.set(key, val2, KV::UpdateMode::Insert);
+        EXPECT_FALSE(err);
+        EXPECT_FALSE(updated);
+    }
+
+    {
+        auto [updated, err] = kv.set(key, val2, KV::UpdateMode::Update);
+        EXPECT_FALSE(err);
+        EXPECT_TRUE(updated);
+    }
+
+    auto [del, del_err] = kv.del(key);
+    EXPECT_TRUE(del);
+    ASSERT_FALSE(del_err);
+
+    {
+        auto [updated, err] = kv.set(key, val1, KV::UpdateMode::Upsert);
+        EXPECT_FALSE(err);
+        EXPECT_TRUE(updated);
+    }
+
+    {
+        auto [updated, err] = kv.set(key, val1, KV::UpdateMode::Upsert);
+        EXPECT_FALSE(err);
+        EXPECT_FALSE(updated);
+    }
+
+    {
+        auto [updated, err] = kv.set(key, val2, KV::UpdateMode::Upsert);
+        EXPECT_FALSE(err);
+        EXPECT_TRUE(updated);
+    }
+
+    ASSERT_FALSE(kv.close());
+
+    std::filesystem::remove(test_db);
 }
 
-TEST(EntryTest, EntryEOF) {
-    bytes empty{};
-    BufferReader empty_reader{std::span<const std::byte>(empty)};
+TEST(KVTest, Recovery) {
+    KV kv(test_db);
+    auto prepare = [&]() {
+        std::filesystem::remove(test_db);
 
-    auto result = EntryCodec::decode(empty_reader);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_TRUE(std::holds_alternative<EntryEOF>(result.value()));
-}
+        auto open_err = kv.open();
+        ASSERT_FALSE(open_err) << "Failed to open KV: " << open_err.message();
 
-TEST(EntryTest, BadChecksumDetection) {
-    Entry ent{to_bytes("k1"), to_bytes("xxx"), false};
-    bytes encoded = EntryCodec::encode(ent);
+        {
+            auto [updated, err] = kv.set(to_bytes("k1"), to_bytes("v1"));
+            ASSERT_TRUE(updated);
+            ASSERT_FALSE(err);
+        }
+        {
+            auto [updated, err] = kv.set(to_bytes("k2"), to_bytes("v2"));
+            ASSERT_TRUE(updated);
+            ASSERT_FALSE(err);
+        }
 
-    encoded.back() ^= std::byte{0xFF};
+        kv.close();
+    };
 
-    BufferReader reader{std::span<const std::byte>(encoded)};
-    auto result = EntryCodec::decode(reader);
+    // -- Truncated log --
+    prepare();
+    {
+        auto size = std::filesystem::file_size(test_db);
+        std::filesystem::resize_file(test_db, size - 1);
 
-    ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error(), db_error::bad_checksum);
+        ASSERT_FALSE(kv.open());
+
+        auto [val1, err1] = kv.get(to_bytes("k1"));
+        ASSERT_TRUE(val1.has_value());
+        EXPECT_EQ(std::string(reinterpret_cast<const char *>(val1->data()), val1->size()), "v1");
+
+        auto [val2, err2] = kv.get(to_bytes("k2"));
+        ASSERT_FALSE(val2.has_value());
+    }
+    ASSERT_FALSE(kv.close());
+
+    // -- Bad checksum --
+    prepare();
+    {
+        std::fstream fs(test_db, std::ios::in | std::ios::out | std::ios::binary);
+        fs.seekp(-1, std::ios::end);
+        fs.put('\0');
+        fs.close();
+
+        ASSERT_FALSE(kv.open());
+
+        auto [val1, err1] = kv.get(to_bytes("k1"));
+        ASSERT_TRUE(val1.has_value());
+        EXPECT_EQ(std::string(reinterpret_cast<const char *>(val1->data()), val1->size()), "v1");
+
+        auto [val2, err2] = kv.get(to_bytes("k2"));
+        ASSERT_FALSE(val2.has_value());
+    }
+    ASSERT_FALSE(kv.close());
+
+    std::filesystem::remove(test_db);
 }

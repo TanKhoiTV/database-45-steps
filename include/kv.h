@@ -59,6 +59,12 @@ class KV {
      */
     std::pair<std::optional<bytes>, std::error_code> get(std::span<const std::byte> key) const;
 
+    enum class UpdateMode {
+        Upsert,
+        Insert,
+        Update
+    };
+
     /**
      * @brief Inserts or updates a value.
      *
@@ -66,7 +72,7 @@ class KV {
      * @param val
      * @return `true` if the key was newly added or the value was different.
      */
-    std::pair<bool, std::error_code> set(std::span<const std::byte> key, std::span<const std::byte> val);
+    std::pair<bool, std::error_code> set(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode = UpdateMode::Upsert);
 
     /**
      * @brief Removes a key from the store.

@@ -27,30 +27,45 @@ std::error_code KV::open() {
 std::error_code KV::close() { return log.close(); }
 
 std::pair<std::optional<bytes>, std::error_code> KV::get(std::span<const std::byte> key) const {
-    auto item = mem.find(bytes(key.begin(), key.end()));
-    if (item == mem.end()) return { std::nullopt, {} };
-    return { item->second, {} };
+    auto it = mem.find(to_bytes(key));
+    if (it == mem.end()) return { std::nullopt, {} };
+    return { it->second, {} };
 }
 
-std::pair<bool, std::error_code> KV::set(std::span<const std::byte> key, std::span<const std::byte> val) {
-    if (auto err = log.write(Entry{to_bytes(key), to_bytes(val), false}); err) {
-        return { false, err };
+std::pair<bool, std::error_code> KV::set(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode) {
+    auto my_key = to_bytes(key);
+    auto my_val = to_bytes(val);
+
+    auto it = mem.find(my_key);
+    bool exist = (it != mem.end());
+    bool updated = false;
+
+    switch (mode) {
+        case UpdateMode::Upsert: updated = !exist || (it->second != my_val); break;
+        case UpdateMode::Insert: updated = !exist; break;
+        case UpdateMode::Update: updated = exist && (it->second != my_val); break;
     }
 
-    auto key_bytes = to_bytes(key);
-    auto val_bytes = to_bytes(val);
+    if (!updated) {
+        return { false, {} };
+    }
 
-    auto [item, inserted] = mem.try_emplace(key_bytes, val_bytes);
-    if (inserted) return { true, {} };
-
-    bool updated = (item->second != val_bytes);
-    if (updated) item->second = val_bytes;
+    if (auto err = log.write(Entry(my_key, my_val, false)); err) {
+        return { false, err };
+    }
+    mem.insert_or_assign(my_key, my_val);
     return { updated, {} };
 }
 
 std::pair<bool, std::error_code> KV::del(std::span<const std::byte> key) {
-    if (auto err = log.write(Entry{to_bytes(key), {}, true}); err)
-        return { false, err };
+    auto my_key = to_bytes(key);
+    auto it = mem.find(my_key);
 
-    return { mem.erase(to_bytes(key)) > 0, {} };
+    if (it == mem.end()) {
+        return { false, {} };
+    }
+    if (auto err = log.write(Entry(my_key, {}, true)); err)
+        return { false, err };
+    mem.erase(it);
+    return { true, {} };
 }

@@ -65,7 +65,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 # --- Test executable ---
-add_executable(kv_test test/test_kv.cpp)
+add_executable(kv_test
+    test/test_kv.cpp
+    test/test_entry.cpp
+)
 
 target_include_directories(kv_test PRIVATE
     ${CMAKE_SOURCE_DIR}/test
