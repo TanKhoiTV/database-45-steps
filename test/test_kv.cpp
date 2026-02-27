@@ -84,28 +84,28 @@ TEST(KVTest, UpdateMode) {
     bytes val1 = to_bytes("v1");
     bytes val2 = to_bytes("v2");
 
-    auto updated = kv.set_ex(key, val1, KeyValue::UpdateMode::Update);
+    auto updated = kv.set_ex(key, val1, KeyValue::WriteMode::Update);
     EXPECT_FALSE(updated.value());
 
-    updated = kv.set_ex(key, val1, KeyValue::UpdateMode::Insert);
+    updated = kv.set_ex(key, val1, KeyValue::WriteMode::Insert);
     EXPECT_TRUE(updated.value());
 
-    updated = kv.set_ex(key, val2, KeyValue::UpdateMode::Insert);
+    updated = kv.set_ex(key, val2, KeyValue::WriteMode::Insert);
     EXPECT_FALSE(updated.value());
 
-    updated = kv.set_ex(key, val2, KeyValue::UpdateMode::Update);
+    updated = kv.set_ex(key, val2, KeyValue::WriteMode::Update);
     EXPECT_TRUE(updated.value());
 
     auto del = kv.del(key);
     EXPECT_TRUE(del);
 
-    updated = kv.set_ex(key, val1, KeyValue::UpdateMode::Upsert);
+    updated = kv.set_ex(key, val1, KeyValue::WriteMode::Upsert);
     EXPECT_TRUE(updated.value());
 
-    updated = kv.set_ex(key, val1, KeyValue::UpdateMode::Upsert);
+    updated = kv.set_ex(key, val1, KeyValue::WriteMode::Upsert);
     EXPECT_FALSE(updated.value());
 
-    updated = kv.set_ex(key, val2, KeyValue::UpdateMode::Upsert);
+    updated = kv.set_ex(key, val2, KeyValue::WriteMode::Upsert);
     EXPECT_TRUE(updated.value());
 
     ASSERT_FALSE(kv.close());

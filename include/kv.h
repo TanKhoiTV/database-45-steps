@@ -60,20 +60,20 @@ class KeyValue {
      */
     std::expected<std::optional<bytes>, std::error_code> get(std::span<const std::byte> key) const;
 
-    enum class UpdateMode {
+    enum class WriteMode {
         Upsert,
         Insert,
         Update
     };
 
-    std::expected<bool, std::error_code> set_ex(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode);
+    std::expected<bool, std::error_code> set_ex(std::span<const std::byte> key, std::span<const std::byte> val, WriteMode mode);
 
     /**
      * @brief Inserts or updates a value.
      *
      * @param key
      * @param val
-     * @return `true` if changes are made, depending on the `UpdateMode`.
+     * @return `true` if changes are made, depending on the `WriteMode`.
      */
     std::expected<bool, std::error_code> set(std::span<const std::byte> key, std::span<const std::byte> val);
 
