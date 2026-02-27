@@ -66,6 +66,8 @@ class KeyValue {
         Update
     };
 
+    std::expected<bool, std::error_code> set_ex(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode);
+
     /**
      * @brief Inserts or updates a value.
      *
@@ -73,7 +75,7 @@ class KeyValue {
      * @param val
      * @return `true` if changes are made, depending on the `UpdateMode`.
      */
-    std::expected<bool, std::error_code> set(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode = UpdateMode::Upsert);
+    std::expected<bool, std::error_code> set(std::span<const std::byte> key, std::span<const std::byte> val);
 
     /**
      * @brief Removes a key from the store.

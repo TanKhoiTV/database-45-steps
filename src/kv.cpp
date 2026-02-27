@@ -32,7 +32,7 @@ std::expected<std::optional<bytes>, std::error_code> KeyValue::get(std::span<con
     return it->second;
 }
 
-std::expected<bool, std::error_code> KeyValue::set(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode) {
+std::expected<bool, std::error_code> KeyValue::set_ex(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode) {
     auto my_key = to_bytes(key);
     auto my_val = to_bytes(val);
 
@@ -53,6 +53,10 @@ std::expected<bool, std::error_code> KeyValue::set(std::span<const std::byte> ke
     }
     mem.insert_or_assign(my_key, my_val);
     return updated;
+}
+
+std::expected<bool, std::error_code> KeyValue::set(std::span<const std::byte> key, std::span<const std::byte> val) {
+    return set_ex(key, val, UpdateMode::Upsert);
 }
 
 std::expected<bool, std::error_code> KeyValue::del(std::span<const std::byte> key) {
