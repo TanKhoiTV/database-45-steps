@@ -25,6 +25,7 @@ set(LIB_SOURCES
     src/entry_codec.cpp
     src/log.cpp
     src/kv.cpp
+    src/cell_codec.cpp
 )
 
 if(UNIX)
@@ -68,6 +69,7 @@ FetchContent_MakeAvailable(googletest)
 add_executable(kv_test
     test/test_kv.cpp
     test/test_entry.cpp
+    test/test_cell.cpp
 )
 
 target_include_directories(kv_test PRIVATE
