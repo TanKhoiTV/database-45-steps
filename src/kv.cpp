@@ -1,7 +1,7 @@
 #include "kv.h"
 #include "types.h"
 
-std::error_code KV::open() {
+std::error_code KeyValue::open() {
     if (log.is_open()) return {};
     if (auto err = log.open(); err) return err;
 
@@ -24,15 +24,15 @@ std::error_code KV::open() {
     return {};
 }
 
-std::error_code KV::close() { return log.close(); }
+std::error_code KeyValue::close() { return log.close(); }
 
-std::expected<std::optional<bytes>, std::error_code> KV::get(std::span<const std::byte> key) const {
+std::expected<std::optional<bytes>, std::error_code> KeyValue::get(std::span<const std::byte> key) const {
     auto it = mem.find(to_bytes(key));
     if (it == mem.end()) return std::nullopt;
     return it->second;
 }
 
-std::expected<bool, std::error_code> KV::set(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode) {
+std::expected<bool, std::error_code> KeyValue::set(std::span<const std::byte> key, std::span<const std::byte> val, UpdateMode mode) {
     auto my_key = to_bytes(key);
     auto my_val = to_bytes(val);
 
@@ -55,7 +55,7 @@ std::expected<bool, std::error_code> KV::set(std::span<const std::byte> key, std
     return updated;
 }
 
-std::expected<bool, std::error_code> KV::del(std::span<const std::byte> key) {
+std::expected<bool, std::error_code> KeyValue::del(std::span<const std::byte> key) {
     auto my_key = to_bytes(key);
     auto it = mem.find(my_key);
 

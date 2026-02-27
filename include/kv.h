@@ -13,7 +13,7 @@
  * @brief KV provides a simple in-memory key-value store with binary support.
  * It tracks state changes for Set and del operations.
  */
-class KV {
+class KeyValue {
     private:
 
     /**
@@ -32,11 +32,11 @@ class KV {
 
     public:
 
-    explicit KV(const std::string &path) : log(path) {}
+    explicit KeyValue(const std::string &path) : log(path) {}
 
     // Disable copying to avoid issues with the file handle
-    KV(const KV &) = delete;
-    KV &operator=(const KV &) = delete;
+    KeyValue(const KeyValue &) = delete;
+    KeyValue &operator=(const KeyValue &) = delete;
 
     /**
      * @brief Clears any existing in-memory data.

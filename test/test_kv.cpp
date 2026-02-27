@@ -9,7 +9,7 @@ const std::string test_db = (std::filesystem::temp_directory_path() / "kvdb_test
 TEST(KVTest, BasicOperations) {
     std::filesystem::remove(test_db);
 
-    KV kv(test_db);
+    KeyValue kv(test_db);
     auto open_err = kv.open();
     ASSERT_FALSE(open_err) << "Failed to open KV: " << open_err.message();
 
@@ -76,7 +76,7 @@ TEST(KVTest, BasicOperations) {
 TEST(KVTest, UpdateMode) {
     std::filesystem::remove(test_db);
 
-    KV kv(test_db);
+    KeyValue kv(test_db);
     auto open_err = kv.open();
     ASSERT_FALSE(open_err) << "Failed to open KV: " << open_err.message();
 
@@ -84,28 +84,28 @@ TEST(KVTest, UpdateMode) {
     bytes val1 = to_bytes("v1");
     bytes val2 = to_bytes("v2");
 
-    auto updated = kv.set(key, val1, KV::UpdateMode::Update);
+    auto updated = kv.set(key, val1, KeyValue::UpdateMode::Update);
     EXPECT_FALSE(updated.value());
 
-    updated = kv.set(key, val1, KV::UpdateMode::Insert);
+    updated = kv.set(key, val1, KeyValue::UpdateMode::Insert);
     EXPECT_TRUE(updated.value());
 
-    updated = kv.set(key, val2, KV::UpdateMode::Insert);
+    updated = kv.set(key, val2, KeyValue::UpdateMode::Insert);
     EXPECT_FALSE(updated.value());
 
-    updated = kv.set(key, val2, KV::UpdateMode::Update);
+    updated = kv.set(key, val2, KeyValue::UpdateMode::Update);
     EXPECT_TRUE(updated.value());
 
     auto del = kv.del(key);
     EXPECT_TRUE(del);
 
-    updated = kv.set(key, val1, KV::UpdateMode::Upsert);
+    updated = kv.set(key, val1, KeyValue::UpdateMode::Upsert);
     EXPECT_TRUE(updated.value());
 
-    updated = kv.set(key, val1, KV::UpdateMode::Upsert);
+    updated = kv.set(key, val1, KeyValue::UpdateMode::Upsert);
     EXPECT_FALSE(updated.value());
 
-    updated = kv.set(key, val2, KV::UpdateMode::Upsert);
+    updated = kv.set(key, val2, KeyValue::UpdateMode::Upsert);
     EXPECT_TRUE(updated.value());
 
     ASSERT_FALSE(kv.close());
@@ -114,7 +114,7 @@ TEST(KVTest, UpdateMode) {
 }
 
 TEST(KVTest, Recovery) {
-    KV kv(test_db);
+    KeyValue kv(test_db);
     auto prepare = [&]() {
         std::filesystem::remove(test_db);
 
