@@ -10,19 +10,20 @@
  */
 enum class db_error {
     ok = 0,
-    truncated_header,
-    truncated_payload,
-    key_too_large,
-    value_too_large,
-    io_failure,
+    truncated_header,       // Entry header is incomplete or file is truncated
+    truncated_payload,      // Key or value payload is missing expected bytes
+    key_too_large,          // Key size exceeds limit
+    value_too_large,        // Value size exceeds limit
+    io_failure,             // I/O failure
     bad_magic,              // file does not begin with KVDB magic number
     unsupported_version,    // format version is newer than this build supports
-    bad_checksum,
-    bad_key,
-    trailing_garbage,
-    type_mismatch,
-    expect_more_data,
-    mode_conflict
+    bad_checksum,           // Entry checksum mismatch, data is possibly corrupt
+    bad_key,                // Key prefix does not match table ID
+    trailing_garbage,       // Unexpected bytes remain after decoding
+    type_mismatch,          // Cell type does not match the schema column type
+    expect_more_data,       // Buffer too short, expected more data
+    mode_conflict,          // Write operation conflicts with existing key state
+    inconsistent_length     // Input parameters have different lengths
 };
 
 /**
@@ -52,6 +53,7 @@ struct DBErrorCategory : std::error_category {
             case db_error::type_mismatch:       return "Cell type does not match the schema column type";
             case db_error::expect_more_data:    return "Buffer too short, expected more data";
             case db_error::mode_conflict:       return "Write operation conflicts with existing key state";
+            case db_error::inconsistent_length: return "Input parameters have different lengths";
             default:                            return "Unknown database error";
         }
     }

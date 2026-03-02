@@ -1,11 +1,10 @@
+// include/cell.h
 #pragma once
 
 #include "types.h"
 #include <cstdint>
 #include <variant>
 #include <string_view>
-#include <algorithm>
-
 
 class Cell {
     public:
@@ -18,16 +17,22 @@ class Cell {
 
     using I64Type = int64_t;
     using StrType = bytes;
-
-    std::variant<std::monostate, I64Type, StrType> value_;
+    using TypeVariants = std::variant<std::monostate, I64Type, StrType>;
 
     private:
+
+    TypeVariants value_;
 
     explicit Cell(std::monostate v) : value_(v) {}
     explicit Cell(I64Type v) : value_(v) {}
     explicit Cell(StrType v) : value_(std::move(v)) {}
 
     public:
+
+    Cell(const Cell &) noexcept = default;
+    Cell &operator=(const Cell &) noexcept = default;
+    Cell(Cell &&) noexcept = default;
+    Cell &operator=(Cell &&) noexcept = default;
 
     static Cell make_empty() { return Cell(std::monostate{}); }
     static Cell make_i64(int64_t val) { return Cell(I64Type{val}); }
@@ -37,6 +42,10 @@ class Cell {
         bytes b(casted_pointer, casted_pointer + strv.size());
         return Cell(StrType{std::move(b)});
     }
+
+    size_t index() const noexcept { return value_.index(); }
+
+    const TypeVariants &value() const noexcept { return value_; }
 
     bool is_empty() const noexcept {
         return std::holds_alternative<std::monostate>(value_);

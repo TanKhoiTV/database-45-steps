@@ -26,6 +26,7 @@ set(LIB_SOURCES
     src/log.cpp
     src/kv.cpp
     src/cell_codec.cpp
+    src/row_codec.cpp
 )
 
 if(UNIX)
@@ -70,6 +71,7 @@ add_executable(kv_test
     test/test_kv.cpp
     test/test_entry.cpp
     test/test_cell.cpp
+    test/test_row.cpp
 )
 
 target_include_directories(kv_test PRIVATE

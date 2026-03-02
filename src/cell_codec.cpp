@@ -1,3 +1,4 @@
+// src/cell_codec.cpp
 #include "cell_codec.h"
 #include "bit_utils.h"
 #include "db_error.h"
@@ -27,19 +28,19 @@ std::error_code CellCodec::encode(const Cell &c, Cell::Type expected, bytes &out
             out.insert(out.end(), val.begin(), val.end());
             return {};
         }
-    }, c.value_);
+    }, c.value());
 }
 
 std::expected<Cell, std::error_code> CellCodec::decode(std::span<const std::byte> &buf, Cell::Type t) {
     switch (t) {
         case Cell::Type::no_type: {
-            buf = buf.subspan<1>();
             if (buf.empty()) {
                 return std::unexpected(db_error::expect_more_data);
             }
             if (buf[0] != null_byte) {
                 return std::unexpected(std::make_error_code(std::errc::illegal_byte_sequence));
             }
+            buf = buf.subspan<1>();
             return Cell::make_empty();
         }
         case Cell::Type::i64: {
