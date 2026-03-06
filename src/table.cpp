@@ -4,8 +4,11 @@
 #include "schema_codec.h"
 
 static bytes schema_registry_key(const std::string &name) {
-    bytes key{SchemaCodec::SCHEMA_NAME_PREFIX};
-    for (char c : name) key.push_back(static_cast<std::byte>(c));
+    bytes key;
+    for (char c : SchemaCodec::SCHEMA_KEY_PREFIX)
+        key.push_back(static_cast<std::byte>(c));
+    for (char c : name)
+        key.push_back(static_cast<std::byte>(c));
     return key;
 }
 
@@ -32,7 +35,7 @@ static std::expected<bool, std::error_code> save_schema(KeyValue &schema_store, 
  * @return std::expected<uint32_t, std::error_code>
  */
 static std::expected<uint32_t, std::error_code> get_next_id(KeyValue &schema_store) {
-    static const bytes counter_key = {SchemaCodec::COUNTER_ID_PREFIX};
+    static const bytes counter_key = to_bytes(SchemaCodec::COUNTER_KEY_PREFIX);
 
     return schema_store.get(counter_key)
         .and_then([](std::optional<bytes> opt) -> std::expected<uint32_t, std::error_code> {

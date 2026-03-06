@@ -38,9 +38,7 @@ class Cell {
     static Cell make_i64(int64_t val) { return Cell(I64Type{val}); }
     static Cell make_str(bytes val) { return Cell(StrType{std::move(val)}); }
     static Cell make_str(std::string_view strv) {
-        auto casted_pointer = reinterpret_cast<const std::byte *>(strv.data());
-        bytes b(casted_pointer, casted_pointer + strv.size());
-        return Cell(StrType{std::move(b)});
+        return Cell(StrType{std::move(to_bytes(strv))});
     }
 
     size_t index() const noexcept { return value_.index(); }

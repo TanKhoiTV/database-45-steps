@@ -38,9 +38,9 @@ inline void dump_file(const std::string &path) {
     std::cerr << std::dec << "\n";
 }
 
-inline bytes to_bytes(const std::string &s) {
-    bytes ret;
-    ret.reserve(s.size());
-    for (const char &c : s) ret.push_back(static_cast<std::byte>(c));
-    return ret;
-}
+// inline bytes to_bytes(const std::string &s) {
+//     bytes ret;
+//     ret.reserve(s.size());
+//     for (const char &c : s) ret.push_back(static_cast<std::byte>(c));
+//     return ret;
+// }
