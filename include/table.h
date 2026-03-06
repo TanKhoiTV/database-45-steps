@@ -11,18 +11,18 @@
 class Table {
     private:
 
-    KeyValue &data_store_;
+    KeyValue &kv_;
     Schema schema_;
 
-    Table(KeyValue &kv, Schema schema) :  data_store_(kv), schema_(schema) {}
+    Table(KeyValue &kv, Schema schema) :  kv_(kv), schema_(schema) {}
 
     public:
 
-    static std::expected<Table, std::error_code> open(KeyValue &data_store, const KeyValue &schema_store, const std::string &name);
+    static std::expected<Table, std::error_code> open(KeyValue &kv, const std::string &name);
 
-    static std::expected<Table, std::error_code> create(KeyValue &data_store, KeyValue &schema_store, Schema schema);
+    static std::expected<Table, std::error_code> create(KeyValue &kv, Schema schema);
 
-    static std::expected<Table, std::error_code> open_or_create(KeyValue &data_store, KeyValue &schema_store, Schema schema);
+    static std::expected<Table, std::error_code> open_or_create(KeyValue &kv, Schema schema);
 
     std::expected<bool, std::error_code> Select(Row &row) const;
     std::expected<bool, std::error_code> Insert(const Row &row);

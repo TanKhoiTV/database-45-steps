@@ -8,8 +8,7 @@
 #include "schema.h"
 #include "schema_codec.h"
 
-const std::string data_db   = (std::filesystem::temp_directory_path() / "kvdb_table_data").string();
-const std::string schema_db = (std::filesystem::temp_directory_path() / "kvdb_table_schema").string();
+const std::string test_db   = (std::filesystem::temp_directory_path() / "kvdb_table_test").string();
 
 // ---------------------------------------------------------------------------
 // Fixture — opens and closes data_store + schema_store around each test
@@ -18,23 +17,16 @@ const std::string schema_db = (std::filesystem::temp_directory_path() / "kvdb_ta
 class TableTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        std::filesystem::remove(data_db);
-        std::filesystem::remove(schema_db);
-
-        ASSERT_FALSE(data_store.open())   << "Failed to open data store";
-        ASSERT_FALSE(schema_store.open()) << "Failed to open schema store";
+        std::filesystem::remove(test_db);
+        ASSERT_FALSE(kv.open())   << "Failed to open KV";
     }
 
     void TearDown() override {
-        data_store.close();
-        schema_store.close();
-
-        std::filesystem::remove(data_db);
-        std::filesystem::remove(schema_db);
+        kv.close();
+        std::filesystem::remove(test_db);
     }
 
-    KeyValue data_store{data_db};
-    KeyValue schema_store{schema_db};
+    KeyValue kv{test_db};
 };
 
 // ---------------------------------------------------------------------------
@@ -60,11 +52,11 @@ static Schema make_link_schema() {
 
 TEST_F(TableTest, CreateAndOpen) {
     // Create succeeds
-    auto created = Table::create(data_store, schema_store, make_link_schema());
+    auto created = Table::create(kv, make_link_schema());
     ASSERT_TRUE(created.has_value()) << created.error().message();
 
     // Open succeeds after create
-    auto opened = Table::open(data_store, schema_store, "link");
+    auto opened = Table::open(kv, "link");
     ASSERT_TRUE(opened.has_value()) << opened.error().message();
 
     // Schema round-trips correctly
@@ -73,29 +65,29 @@ TEST_F(TableTest, CreateAndOpen) {
     EXPECT_EQ(opened.value().schema().pkey_,      (std::vector<size_t>{1, 2}));
 
     // Creating the same table again fails
-    auto duplicate = Table::create(data_store, schema_store, make_link_schema());
+    auto duplicate = Table::create(kv, make_link_schema());
     ASSERT_FALSE(duplicate.has_value());
     EXPECT_EQ(duplicate.error(), make_error_code(db_error::table_already_exists));
 
     // Opening a nonexistent table fails
-    auto missing = Table::open(data_store, schema_store, "nonexistent");
+    auto missing = Table::open(kv, "nonexistent");
     ASSERT_FALSE(missing.has_value());
     EXPECT_EQ(missing.error(), make_error_code(db_error::table_not_found));
 }
 
 TEST_F(TableTest, OpenOrCreate) {
     // First call creates
-    auto first = Table::open_or_create(data_store, schema_store, make_link_schema());
+    auto first = Table::open_or_create(kv, make_link_schema());
     ASSERT_TRUE(first.has_value()) << first.error().message();
 
     // Second call opens — same schema
-    auto second = Table::open_or_create(data_store, schema_store, make_link_schema());
+    auto second = Table::open_or_create(kv, make_link_schema());
     ASSERT_TRUE(second.has_value()) << second.error().message();
     EXPECT_EQ(first.value().schema().id_, second.value().schema().id_);
 }
 
 TEST_F(TableTest, SelectInsertUpdateDelete) {
-    auto result = Table::create(data_store, schema_store, make_link_schema());
+    auto result = Table::create(kv, make_link_schema());
     ASSERT_TRUE(result.has_value()) << result.error().message();
     Table &table = result.value();
 
@@ -183,7 +175,7 @@ TEST_F(TableTest, SelectInsertUpdateDelete) {
 }
 
 TEST_F(TableTest, UpsertBehavior) {
-    auto result = Table::create(data_store, schema_store, make_link_schema());
+    auto result = Table::create(kv, make_link_schema());
     ASSERT_TRUE(result.has_value()) << result.error().message();
     Table &table = result.value();
 
@@ -212,7 +204,7 @@ TEST_F(TableTest, UpsertBehavior) {
 TEST_F(TableTest, Persistence) {
     // Create and populate
     {
-        auto result = Table::create(data_store, schema_store, make_link_schema());
+        auto result = Table::create(kv, make_link_schema());
         ASSERT_TRUE(result.has_value()) << result.error().message();
         Table &table = result.value();
 
@@ -225,13 +217,11 @@ TEST_F(TableTest, Persistence) {
     }
 
     // Close and reopen stores
-    ASSERT_FALSE(data_store.close());
-    ASSERT_FALSE(schema_store.close());
-    ASSERT_FALSE(data_store.open());
-    ASSERT_FALSE(schema_store.open());
+    ASSERT_FALSE(kv.close());
+    ASSERT_FALSE(kv.open());
 
     // Verify schema round-trips correctly before touching the table
-    auto reopened = Table::open(data_store, schema_store, "link");
+    auto reopened = Table::open(kv, "link");
     ASSERT_TRUE(reopened.has_value()) << reopened.error().message();
 
     const Schema &s = reopened.value().schema();
@@ -246,7 +236,7 @@ TEST_F(TableTest, Persistence) {
     std::cerr << "  pkey[" << i << "] = " << s.pkey_[i] << "\n";
 
     // Reopen table — schema survives
-    auto reopened2 = Table::open(data_store, schema_store, "link");
+    auto reopened2 = Table::open(kv, "link");
     ASSERT_TRUE(reopened2.has_value()) << reopened2.error().message();
     Table &table = reopened2.value();
 
@@ -266,7 +256,7 @@ TEST_F(TableTest, Persistence) {
     }
 
     // Dump the raw value stored in KV
-    auto raw = data_store.get(key.value());
+    auto raw = kv.get(key.value());
     if (raw.has_value() && raw.value().has_value()) {
         std::cerr << "raw value (" << raw.value().value().size() << " bytes): ";
         for (auto b : raw.value().value())
