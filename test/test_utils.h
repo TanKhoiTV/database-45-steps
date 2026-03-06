@@ -1,7 +1,7 @@
 #pragma once
 
-#include "reader.h"
-#include "types.h"
+#include "core/types.h"
+#include "core/reader.h"
 #include <span>
 #include <cstddef>
 #include <algorithm>

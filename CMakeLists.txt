@@ -22,19 +22,20 @@ configure_file(
 
 # --- Library sources ---
 set(LIB_SOURCES
-    src/entry_codec.cpp
-    src/log.cpp
-    src/kv.cpp
-    src/cell_codec.cpp
-    src/row_codec.cpp
-    src/schema_codec.cpp
-    src/table.cpp
+    src/kv/entry_codec.cpp
+    src/kv/log.cpp
+    src/kv/kv.cpp
+    src/table/cell_codec.cpp
+    src/table/row_codec.cpp
+    src/table/schema_codec.cpp
+    src/table/table.cpp
+    src/sql/database.cpp
 )
 
 if(UNIX)
-    list(APPEND LIB_SOURCES src/platform_unix.cpp)
+    list(APPEND LIB_SOURCES src/core/platform_unix.cpp)
 elseif(WIN32)
-    list(APPEND LIB_SOURCES src/platform_windows.cpp)
+    list(APPEND LIB_SOURCES src/core/platform_windows.cpp)
 else()
     message(FATAL_ERROR "Unsupported platform")
 endif()
@@ -70,11 +71,11 @@ FetchContent_MakeAvailable(googletest)
 
 # --- Test executable ---
 add_executable(kv_test
-    test/test_kv.cpp
-    test/test_entry.cpp
-    test/test_cell.cpp
-    test/test_row.cpp
-    test/test_table.cpp
+    test/kv/test_kv.cpp
+    test/kv/test_entry.cpp
+    test/table/test_cell.cpp
+    test/table/test_row.cpp
+    test/table/test_table.cpp
 )
 
 target_include_directories(kv_test PRIVATE
