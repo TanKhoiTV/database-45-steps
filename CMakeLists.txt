@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(kvdb
     VERSION             0.8.0
-    DESCRIPTION         "File-backed key-value store with sequential log"
+    DESCRIPTION         "File-backed key-value store with structured table support"
     LANGUAGES           CXX
 )
 
