@@ -2,6 +2,8 @@
 #include "row.h"
 #include "row_codec.h"
 #include "cell.h"
+#include "schema.h"
+#include "schema_codec.h"
 #include <gtest/gtest.h>
 #include <vector>
 #include <string>

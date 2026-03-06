@@ -1,6 +1,7 @@
 #include "table.h"
 #include "row.h"
 #include "bit_utils.h"
+#include "schema_codec.h"
 
 static bytes schema_registry_key(const std::string &name) {
     bytes key{SchemaCodec::SCHEMA_NAME_PREFIX};

@@ -5,6 +5,8 @@
 #include "table.h"
 #include "row.h"
 #include "test_utils.h"
+#include "schema.h"
+#include "schema_codec.h"
 
 const std::string data_db   = (std::filesystem::temp_directory_path() / "kvdb_table_data").string();
 const std::string schema_db = (std::filesystem::temp_directory_path() / "kvdb_table_schema").string();

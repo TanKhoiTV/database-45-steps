@@ -27,6 +27,7 @@ set(LIB_SOURCES
     src/kv.cpp
     src/cell_codec.cpp
     src/row_codec.cpp
+    src/schema_codec.cpp
     src/table.cpp
 )
 

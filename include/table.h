@@ -3,6 +3,8 @@
 #include "kv.h"
 #include "row.h"
 #include "row_codec.h"
+#include "schema.h"
+#include "schema_codec.h"
 #include <system_error>
 #include <string>
 
