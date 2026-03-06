@@ -23,7 +23,10 @@ enum class db_error {
     type_mismatch,          // Cell type does not match the schema column type
     expect_more_data,       // Buffer too short, expected more data
     mode_conflict,          // Write operation conflicts with existing key state
-    inconsistent_length     // Input parameters have different lengths
+    inconsistent_length,    // Input parameters have different lengths
+    unsupported_type,       // The handling of given type is not provided
+    table_not_found,        // Seeking table does not exist
+    table_already_exists,   // Seeking table already exists
 };
 
 /**
@@ -54,6 +57,9 @@ struct DBErrorCategory : std::error_category {
             case db_error::expect_more_data:    return "Buffer too short, expected more data";
             case db_error::mode_conflict:       return "Write operation conflicts with existing key state";
             case db_error::inconsistent_length: return "Input parameters have different lengths";
+            case db_error::unsupported_type:    return "This Cell type is not supported, add proper implementation";
+            case db_error::table_not_found:     return "The table with given ID is not found";
+            case db_error::table_already_exists:return "The table with given ID already exists";
             default:                            return "Unknown database error";
         }
     }

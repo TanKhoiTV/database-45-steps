@@ -27,12 +27,12 @@ class KeyValue {
         }
     };
 
-    Log log;
-    std::unordered_map<bytes, bytes, ByteVectorHash> mem;
+    Log log_;
+    std::unordered_map<bytes, bytes, ByteVectorHash> mem_;
 
     public:
 
-    explicit KeyValue(const std::string &path) : log(path) {}
+    explicit KeyValue(const std::string &path) : log_(path) {}
 
     // Disable copying to avoid issues with the file handle
     KeyValue(const KeyValue &) = delete;

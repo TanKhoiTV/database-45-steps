@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(kvdb
-    VERSION             0.7.0
+    VERSION             0.8.0
     DESCRIPTION         "File-backed key-value store with sequential log"
     LANGUAGES           CXX
 )
@@ -27,6 +27,7 @@ set(LIB_SOURCES
     src/kv.cpp
     src/cell_codec.cpp
     src/row_codec.cpp
+    src/table.cpp
 )
 
 if(UNIX)
@@ -72,6 +73,7 @@ add_executable(kv_test
     test/test_entry.cpp
     test/test_cell.cpp
     test/test_row.cpp
+    test/test_table.cpp
 )
 
 target_include_directories(kv_test PRIVATE

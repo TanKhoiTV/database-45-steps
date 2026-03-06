@@ -9,14 +9,14 @@
 
 TEST(RowTest, BasicOps) {
     auto schema = Schema{
-        .id = static_cast<uint32_t>(0x00000001),
-        .name = std::string{"link"},
-        .cols = std::vector<ColumnHeader>{
+        static_cast<uint32_t>(0x00000001),
+        std::string{"link"},
+        std::vector<ColumnHeader>{
             ColumnHeader{"time", Cell::Type::i64},
             ColumnHeader{"src", Cell::Type::str},
             ColumnHeader{"dst", Cell::Type::str}
         },
-        .pkey = std::vector<size_t>{1, 2}
+        std::vector<size_t>{1, 2}
     };
 
     auto row = Row{

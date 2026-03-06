@@ -91,9 +91,9 @@ template <Reader R> DecodeResult EntryCodec::decode(R &reader) {
 
     // Unpack the payload
     Entry ent;
-    ent.deleted = is_deleted;
-    ent.key.assign(payload.begin(), payload.begin() + klen);
-    if (!is_deleted) ent.val.assign(payload.begin() + klen, payload.end());
+    ent.deleted_ = is_deleted;
+    ent.key_.assign(payload.begin(), payload.begin() + klen);
+    if (!is_deleted) ent.val_.assign(payload.begin() + klen, payload.end());
 
     return ent;
 }

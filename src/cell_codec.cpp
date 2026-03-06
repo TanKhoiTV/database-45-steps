@@ -4,6 +4,7 @@
 #include "db_error.h"
 #include <cstddef>
 #include <utility>
+#include <optional>
 
 template<class... Ts> struct overloads : Ts... { using Ts::operator()...; };
 
@@ -27,6 +28,10 @@ std::error_code CellCodec::encode(const Cell &c, Cell::Type expected, bytes &out
             out.insert(out.end(), len_bytes.begin(), len_bytes.end());
             out.insert(out.end(), val.begin(), val.end());
             return {};
+        },
+        [&](auto &&unexpected_type) -> std::error_code {
+            static_assert(sizeof(unexpected_type) == 0, "Non-exhaustive visitor. Handle the new Cell type.");
+            return db_error::unsupported_type;
         }
     }, c.value());
 }
@@ -67,5 +72,17 @@ std::expected<Cell, std::error_code> CellCodec::decode(std::span<const std::byte
             return Cell::make_str(std::move(data));
         }
         default: std::unreachable();
+    }
+}
+
+std::optional<Cell::Type> CellCodec::read_cell_type(std::span<const std::byte> &buf) {
+    if (buf.empty()) return std::nullopt;
+    auto t = static_cast<uint8_t>(buf[0]);
+    buf = buf.subspan<1>();
+    switch (t) {
+        case static_cast<uint8_t>(Cell::Type::no_type): return Cell::Type::no_type;
+        case static_cast<uint8_t>(Cell::Type::i64): return Cell::Type::i64;
+        case static_cast<uint8_t>(Cell::Type::str): return Cell::Type::str;
+        default: return std::nullopt;
     }
 }

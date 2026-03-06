@@ -8,15 +8,15 @@
  *
  */
 struct Entry {
-    bytes key;
-    bytes val;
-    bool deleted;
+    bytes key_;
+    bytes val_;
+    bool deleted_;
 
     Entry() = default;
-    Entry(bytes _key, bytes _val, bool _deleted)
-        : key(std::move(_key)), val(std::move(_val)), deleted(_deleted) {}
+    Entry(bytes key, bytes val, bool deleted)
+        : key_(std::move(key)), val_(std::move(val)), deleted_(deleted) {}
 
     bool operator==(const Entry &other) const noexcept {
-        return key == other.key && val == other.val && deleted == other.deleted;
+        return key_ == other.key_ && val_ == other.val_ && deleted_ == other.deleted_;
     }
 };

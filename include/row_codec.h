@@ -18,11 +18,21 @@ class RowCodec {
     static bytes key_prefix(const Schema &schema);
 
     static inline Row new_row(const Schema &schema) {
-        return Row(schema.cols.size(), Cell::make_empty());
+        return Row(schema.cols_.size(), Cell::make_empty());
     }
 
     static std::expected<bytes, std::error_code> encode_key(const Schema &schema, const Row &row);
     static std::expected<bytes, std::error_code> encode_val(const Schema &schema, const Row &row);
     static std::error_code decode_key(const Schema &schema, Row &row, std::span<const std::byte> key);
     static std::error_code decode_val(const Schema &schema, Row &row, std::span<const std::byte> val);
+};
+
+class SchemaCodec {
+    public:
+
+    static constexpr std::byte SCHEMA_NAME_PREFIX = static_cast<std::byte>(0xff);
+    static constexpr std::byte COUNTER_ID_PREFIX = static_cast<std::byte>(0xfe);
+
+    static bytes encode(const Schema &schema);
+    static std::expected<Schema, std::error_code> decode(std::span<const std::byte> buf);
 };

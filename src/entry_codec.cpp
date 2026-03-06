@@ -4,22 +4,22 @@
 // #include <array>
 
 bytes EntryCodec::encode(const Entry &ent) {
-    uint32_t klen = static_cast<uint32_t>(ent.key.size());
-    uint32_t vlen = ent.deleted ? 0 : static_cast<uint32_t>(ent.val.size());
+    uint32_t klen = static_cast<uint32_t>(ent.key_.size());
+    uint32_t vlen = ent.deleted_ ? 0 : static_cast<uint32_t>(ent.val_.size());
 
-    bytes buf(HEADER_SIZE + klen + (ent.deleted ? 0 : vlen));
+    bytes buf(HEADER_SIZE + klen + (ent.deleted_ ? 0 : vlen));
 
     auto klen_bytes = pack_le<uint32_t>(klen);
     auto vlen_bytes = pack_le<uint32_t>(vlen);
     std::copy(klen_bytes.begin(), klen_bytes.end(), buf.begin() + KLEN_OFFSET);
     std::copy(vlen_bytes.begin(), vlen_bytes.end(), buf.begin() + VLEN_OFFSET);
 
-    buf[FLAG_OFFSET] = static_cast<std::byte>(ent.deleted ? 1 : 0);
+    buf[FLAG_OFFSET] = static_cast<std::byte>(ent.deleted_ ? 1 : 0);
 
     // Copying key and value data
-    std::copy(ent.key.begin(), ent.key.end(), buf.begin() + HEADER_SIZE);
-    if (!ent.deleted) {
-        std::copy(ent.val.begin(), ent.val.end(), buf.begin() + HEADER_SIZE + klen);
+    std::copy(ent.key_.begin(), ent.key_.end(), buf.begin() + HEADER_SIZE);
+    if (!ent.deleted_) {
+        std::copy(ent.val_.begin(), ent.val_.end(), buf.begin() + HEADER_SIZE + klen);
     }
 
     // Compute the checksum and add to the header

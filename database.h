@@ -4,9 +4,9 @@
  * @brief A basic in-memory Key-Value database implementation with append-only logging.
  * @version 0.3.0
  * @date 2026-02-20
- * 
+ *
  * @copyright Copyright (c) under MIT license, 2026
- * 
+ *
  */
 
 #pragma once
@@ -70,7 +70,7 @@ struct std::is_error_code_enum<db_error> : std::true_type {};
 
 /**
  * @brief Represents a single database entry for serialization
- * 
+ *
  */
 struct Entry {
     // Header layout constants
@@ -83,14 +83,14 @@ struct Entry {
     static constexpr size_t MAX_KEY_SIZE = 1024;            // 1 KB limit
     static constexpr size_t MAX_VAL_SIZE = 1024 * 1024;     // 1 MB limit
 
-    bytes key;
-    bytes val;
-    bool deleted;
+    bytes key_;
+    bytes val_;
+    bool deleted_;
 
-    Entry() : deleted(false) {}
+    Entry() : deleted_(false) {}
 
     Entry(bytes _key, bytes _val, bool _deleted)
-        : key(std::move(_key)), val(std::move(_val)), deleted(_deleted) {}
+        : key_(std::move(_key)), val_(std::move(_val)), deleted_(_deleted) {}
 
     /** @brief Packs/Loads a 32-bit integer (4 bytes) into a buffer in Little Endian */
     static void pack_u32(bytes &buf, size_t offset, uint32_t val) {
@@ -102,9 +102,9 @@ struct Entry {
 
     /** @brief Unpacks Little Endian bytes from buffer */
     static uint32_t unpack_u32(const uint8_t *buf) {
-        return static_cast<uint32_t>(buf[0]) | 
-            (static_cast<uint32_t>(buf[1]) << 8) | 
-            (static_cast<uint32_t>(buf[2]) << 16) | 
+        return static_cast<uint32_t>(buf[0]) |
+            (static_cast<uint32_t>(buf[1]) << 8) |
+            (static_cast<uint32_t>(buf[2]) << 16) |
             (static_cast<uint32_t>(buf[3]) << 24);
     }
 
@@ -114,19 +114,19 @@ struct Entry {
      * @return bytes containing the encoded entry.
      */
     bytes Encode() const {
-        uint32_t klen = static_cast<uint32_t>(key.size());
-        uint32_t vlen = static_cast<uint32_t>(val.size());
+        uint32_t klen = static_cast<uint32_t>(key_.size());
+        uint32_t vlen = static_cast<uint32_t>(val_.size());
 
-        bytes buf(HEADER_SIZE + klen + (deleted ? 0 : vlen));
+        bytes buf(HEADER_SIZE + klen + (deleted_ ? 0 : vlen));
 
         pack_u32(buf, KLEN_OFFSET, klen);
         pack_u32(buf, VLEN_OFFSET, vlen);
-        buf[FLAG_OFFSET] = static_cast<std::byte>(deleted ? 1 : 0);
+        buf[FLAG_OFFSET] = static_cast<std::byte>(deleted_ ? 1 : 0);
 
         // Copying key and value data
-        std::copy(key.begin(), key.end(), buf.begin() + HEADER_SIZE);
-        if (!deleted) {
-            std::copy(val.begin(), val.end(), buf.begin() + HEADER_SIZE + klen);
+        std::copy(key_.begin(), key_.end(), buf.begin() + HEADER_SIZE);
+        if (!deleted_) {
+            std::copy(val_.begin(), val_.end(), buf.begin() + HEADER_SIZE + klen);
         }
 
         return buf;
@@ -134,7 +134,7 @@ struct Entry {
 
     /**
      * @brief Deserializes an entry from a stream.
-     * 
+     *
      * @param `is` The input stream
      * @return An error if reading fails.
      */
@@ -147,7 +147,7 @@ struct Entry {
         // Unpack the header
         uint32_t klen = unpack_u32(header + KLEN_OFFSET);
         uint32_t vlen = unpack_u32(header + VLEN_OFFSET);
-        deleted = (header[FLAG_OFFSET] != 0);
+        deleted_ = (header[FLAG_OFFSET] != 0);
 
         // Impose data limits
         if (klen > MAX_KEY_SIZE)
@@ -156,19 +156,19 @@ struct Entry {
             return db_error::value_too_large;
 
         // Unpack the key
-        key.resize(klen);
-        if (!is.read(reinterpret_cast<char *>(key.data()), klen))
+        key_.resize(klen);
+        if (!is.read(reinterpret_cast<char *>(key_.data()), klen))
             return db_error::truncated_payload;
-        
+
         // Unpack the value data if it exists
-        if (!deleted) {
-            val.resize(vlen);
-            if (!is.read(reinterpret_cast<char *>(val.data()), vlen))
+        if (!deleted_) {
+            val_.resize(vlen);
+            if (!is.read(reinterpret_cast<char *>(val_.data()), vlen))
                 return db_error::truncated_payload;
         } else {
-            val.clear();
+            val_.clear();
         }
-        
+
         return {};
     }
 };
@@ -187,9 +187,9 @@ struct ByteVectorHash {
 
 /**
  * @brief Simple file-backed append/read log for encoded Entry objects
- * 
+ *
  * Manages a file stream used to append encoded entries and decode entries from the file.
- * 
+ *
  * @note This class is not thread-safe. Callers must synchronize access if the same Log instance is used concurrently.
  */
 class Log {
@@ -197,41 +197,41 @@ class Log {
 
     /**
      * @brief Construct a new Log object
-     * 
+     *
      * @param fname Path to the log file. The path is stored by value.
-     * 
+     *
      * The constructor does not open the file; call `Open()` to create/open the underlying file stream.
      */
-    explicit Log(std::string fname) : filename(std::move(fname)) {}
+    explicit Log(std::string fname) : filename_(std::move(fname)) {}
 
-    string filename;
+    string filename_;
     std::fstream fs;    // File Stream
 
     /**
      * @brief Open the log file for appending and reading.
-     * 
+     *
      * Perform these checks/steps:
-     * 
+     *
      * - Returns an error if @p filename exists and is a directory.
-     * 
+     *
      * - Attempts to open the file with: in | out | binary | app; creates the file if it doesn't exist.
-     * 
+     *
      * - On failure maps common @c errno values to `std::errc`-derived errors.
-     * 
+     *
      * - Clears any EOF flags on success so subsequent streaming operations are usable.
-     * 
+     *
      * @return error Default-constructed (no error) on success; otherwise an error code describing the failure.
      */
     error Open() {
         if (fs.is_open()) return {};
 
         // Error handling: File name is a directory instead of file
-        if (std::filesystem::exists(filename) && std::filesystem::is_directory(filename))
+        if (std::filesystem::exists(filename_) && std::filesystem::is_directory(filename_))
             return make_error_code(std::errc::is_a_directory);
 
         // Try opening the file for reads and writes in binary, with writes append to end of file. Append also creates the file if it doesn't exist.
-        fs.open(filename, std::ios::in | std::ios::out | std::ios::binary | std::ios::app);
-        
+        fs.open(filename_, std::ios::in | std::ios::out | std::ios::binary | std::ios::app);
+
         // Handling common errors
         if (!fs.is_open()) {
             switch (errno) {
@@ -248,7 +248,7 @@ class Log {
 
     /**
      * @brief Close the underlying file stream.
-     * 
+     *
      * @return error No error on success; `io_error` otherwise.
      */
     error Close() {
@@ -259,10 +259,10 @@ class Log {
 
     /**
      * @brief Append an encoded Entry to the log file
-     * 
+     *
      * @param ent Entry to encode and write
-     * @return error 
-     * @note The method assumes the file stream is opened. 
+     * @return error
+     * @note The method assumes the file stream is opened.
      * Behavior is undefined or an I/O error is triggered if called on a closed stream.
      */
     error Write(const Entry &ent) {
@@ -281,7 +281,7 @@ class Log {
 
     /**
      * @brief Read and decode the next entry from the file stream.
-     * 
+     *
      * @param[out] ent Entry object to be populated with decoded data.
      * @return `std::pair<bool, error>` The boolean signifies EOF in which case no error is returned.
      */
@@ -324,7 +324,7 @@ class KV {
     /**
      * @brief Clears any existing in-memory data.
      * Then reads from the internal log to initialize the database.
-     * @return An error code. 
+     * @return An error code.
      */
     error Open() {
         if (log.fs.is_open()) return {};
@@ -339,8 +339,8 @@ class KV {
             if (err) return err;
             if (eof) break;
 
-            if (ent.deleted) mem.erase(ent.key);
-            else mem[ent.key] = std::move(ent.val);
+            if (ent.deleted_) mem.erase(ent.key_);
+            else mem[ent.key_] = std::move(ent.val_);
         }
 
         return {};
@@ -348,7 +348,7 @@ class KV {
 
     /**
      * @brief Closes the database.
-     * 
+     *
      * @return An error code (if there's any).
      */
     error Close() { return log.Close(); }
@@ -356,8 +356,8 @@ class KV {
     /**
      * @brief Retrieves a value by key.
      * Returns a pair containing the value (if found) and an error code.
-     * @param key 
-     * @return `pair<optional<bytes>, error>`. This method returns no error code for now. 
+     * @param key
+     * @return `pair<optional<bytes>, error>`. This method returns no error code for now.
      */
     std::pair<std::optional<bytes>, error> Get(const bytes &key) const {
         auto item = mem.find(key);
@@ -367,9 +367,9 @@ class KV {
 
     /**
      * @brief Inserts or updates a value.
-     * 
-     * @param key 
-     * @param val 
+     *
+     * @param key
+     * @param val
      * @return `true` if the key was newly added or the value was different.
      */
     std::pair<bool, error> Set(const bytes &key, const bytes &val) {
@@ -390,8 +390,8 @@ class KV {
 
     /**
      * @brief Removes a key from the store.
-     * 
-     * @param key 
+     *
+     * @param key
      * @return `true` if the key existed and was successfully deleted.
      */
     std::pair<bool, error> Del(const bytes &key) {

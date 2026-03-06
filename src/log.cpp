@@ -38,39 +38,39 @@ static std::error_code read_and_validate_file_header(FileHandle &fh) {
 }
 
 std::error_code Log::open() {
-    if (fh.is_open()) return {};
+    if (fh_.is_open()) return {};
 
     // Error handling: File name is a directory instead of file
-    if (std::filesystem::exists(filename) && std::filesystem::is_directory(filename))
+    if (std::filesystem::exists(filename_) && std::filesystem::is_directory(filename_))
         return make_error_code(std::errc::is_a_directory);
 
-    if (auto err = platform_open_file(filename, fh)) return err;
+    if (auto err = platform_open_file(filename_, fh_)) return err;
 
     std::error_code fs_err;
-    auto size = std::filesystem::file_size(filename, fs_err);
+    auto size = std::filesystem::file_size(filename_, fs_err);
     if (fs_err) return fs_err;
 
-    if (size == 0) return write_file_header(fh);
+    if (size == 0) return write_file_header(fh_);
 
-    if (auto err = platform_seek(fh, 0, SEEK_SET); err) return err;
-    return read_and_validate_file_header(fh);
+    if (auto err = platform_seek(fh_, 0, SEEK_SET); err) return err;
+    return read_and_validate_file_header(fh_);
 }
 
 std::error_code Log::close() {
-    return platform_close(fh);
+    return platform_close(fh_);
 }
 
 std::error_code Log::write(const Entry &ent) {
-    if (auto err = platform_seek(fh, 0, SEEK_END); err) return err;
+    if (auto err = platform_seek(fh_, 0, SEEK_END); err) return err;
 
     bytes data = EntryCodec::encode(ent);
-    if (auto err = platform_write(fh, std::span<std::byte>(data)); err)
+    if (auto err = platform_write(fh_, std::span<std::byte>(data)); err)
         return err;
-    return platform_sync(fh);
+    return platform_sync(fh_);
 }
 
 ReadResult Log::read() {
-    auto result = EntryCodec::decode(fh);
+    auto result = EntryCodec::decode(fh_);
 
     // Treat tail corruption as EOF silently, future implementation should have a flag to trigger a warning.
     if (!result.has_value()) {
@@ -93,9 +93,9 @@ ReadResult Log::read() {
 }
 
 std::error_code Log::seek_to_first_entry() {
-    return platform_seek(fh, log_format::HEADER_SIZE, SEEK_SET);
+    return platform_seek(fh_, log_format::HEADER_SIZE, SEEK_SET);
 }
 
 Log::~Log() {
-    if (fh.is_open()) platform_close(fh);
+    if (fh_.is_open()) platform_close(fh_);
 }

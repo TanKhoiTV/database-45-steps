@@ -6,7 +6,9 @@
 #include <cstddef>      // std::byte
 #include <algorithm>    // std::ranges::reverse
 #include <cstdint>      // uint32_t
-
+#include <optional>
+#include <string>
+#include <string_view>
 
 template <std::integral T>
 std::array<std::byte, sizeof(T)> pack_le(T val) {
@@ -17,14 +19,37 @@ std::array<std::byte, sizeof(T)> pack_le(T val) {
 
 template <std::integral T>
 T unpack_le(std::span<const std::byte, sizeof(T)> buf) {
-    std::array<std::byte, sizeof(T)> arr;
-    std::copy(buf.begin(), buf.end(), arr.begin());
-    auto val = std::bit_cast<T>(arr);
+    auto val = std::bit_cast<T>(*reinterpret_cast<const std::array<std::byte, sizeof(T)> *>(buf.data()));
     if constexpr (std::endian::native != std::endian::little)
         val = std::byteswap(val);
     return val;
 }
 
+inline void push_u32(bytes &out, uint32_t v) {
+    auto b = pack_le<uint32_t>(v);
+    out.insert(out.end(), b.begin(), b.end());
+}
+
+inline void push_str(bytes &out, std::string_view s) {
+    push_u32(out, static_cast<uint32_t>(s.size()));
+    auto p = reinterpret_cast<const std::byte *>(s.data());
+    out.insert(out.end(), p, p + s.size());
+}
+
+inline std::optional<uint32_t> read_u32(std::span<const std::byte> &buf) {
+    if (buf.size() < sizeof(uint32_t)) return std::nullopt;
+    auto v = unpack_le<uint32_t>(buf.first<sizeof(uint32_t)>());
+    buf = buf.subspan<sizeof(uint32_t)>();
+    return v;
+}
+
+inline std::optional<std::string> read_str(std::span<const std::byte> &buf) {
+    auto len = read_u32(buf);
+    if (!len || buf.size() < *len) return std::nullopt;
+    std::string s(reinterpret_cast<const char *>(buf.data()), *len);
+    buf = buf.subspan(*len);
+    return s;
+}
 
 // --- CRC32 Hashing utility ---
 

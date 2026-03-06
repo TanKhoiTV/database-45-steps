@@ -3,6 +3,7 @@
 #include "cell.h"
 #include <expected>
 #include <system_error>
+#include <optional>
 
 class CellCodec {
     public:
@@ -12,4 +13,6 @@ class CellCodec {
     static std::error_code encode(const Cell &c, Cell::Type expected, bytes &out);
 
     static std::expected<Cell, std::error_code> decode(std::span<const std::byte> &buf, Cell::Type t);
+
+    static std::optional<Cell::Type> read_cell_type(std::span<const std::byte> &buf);
 };

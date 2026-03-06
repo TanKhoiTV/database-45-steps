@@ -19,8 +19,8 @@ using ReadResult = std::expected<std::variant<Entry, LogEOF>, std::error_code>;
 class Log {
     private:
 
-    std::string filename;
-    FileHandle fh;
+    std::string filename_;
+    FileHandle fh_;
 
     public:
 
@@ -31,7 +31,7 @@ class Log {
      *
      * The constructor does not open the file; call `open()` to create/open the underlying file stream.
      */
-    explicit Log(std::string fname) : filename(std::move(fname)) {}
+    explicit Log(std::string fname) : filename_(std::move(fname)) {}
 
     Log(Log &&) = default;
     Log &operator=(Log &&) = default;
@@ -81,7 +81,7 @@ class Log {
 
     std::error_code seek_to_first_entry();
 
-    bool is_open() const noexcept { return fh.is_open(); }
+    bool is_open() const noexcept { return fh_.is_open(); }
 
     ~Log();
 };
