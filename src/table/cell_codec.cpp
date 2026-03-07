@@ -1,14 +1,23 @@
-// src/cell_codec.cpp
-#include "core/types.h"
-#include "core/bit_utils.h"
-#include "core/db_error.h"
-#include "table/cell_codec.h"
-#include <cstddef>
-#include <utility>
-#include <optional>
-#include <system_error>
+// src/table/cell_codec.cpp
 
+/**
+ * @file cell_codec.cpp
+ * @brief Implementation of @ref CellCodec encode, decode, and type-tag reader.
+ */
+
+#include "core/types.h"         // bytes
+#include "core/bit_utils.h"     // pack_le, unpack_le
+#include "core/db_error.h"      // db_error
+#include "table/cell_codec.h"
+#include <cstddef>              // std::byte
+#include <utility>              // std::unreachable
+#include <optional>             // std::optional
+#include <system_error>         // std::error_code
+
+/** @cond INTERNAL */
+/// Helper that lets multiple lambda overloads compose into a single visitor.
 template<class... Ts> struct overloads : Ts... { using Ts::operator()...; };
+/** @endcond */
 
 std::error_code CellCodec::encode(const Cell &c, Cell::Type expected, bytes &out) {
     return std::visit(overloads{

@@ -1,7 +1,14 @@
-#include "core/types.h"
-#include "core/bit_utils.h"
-#include "core/db_error.h"
-#include "table/cell_codec.h"
+// src/table/schema_codec.cpp
+
+/**
+ * @file schema_codec.cpp
+ * @brief Implementation of @ref SchemaCodec encode and decode.
+ */
+
+#include "core/types.h"         // bytes
+#include "core/bit_utils.h"     // push_u32, push_str, read_u32, read_str
+#include "core/db_error.h"      // db_error
+#include "table/cell_codec.h"   // CellCodec::read_cell_type
 #include "table/schema_codec.h"
 
 bytes SchemaCodec::encode(const Schema &schema) {

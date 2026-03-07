@@ -1,8 +1,27 @@
-#include "kv/entry_codec.h"
-// #include "bit_utils.h"
-// #include <algorithm>
-// #include <array>
+// src/kv/entry_codec.cpp
 
+/**
+ * @file entry_codec.cpp
+ * @brief Implementation of @ref EntryCodec::encode.
+ *
+ * The decode path is a function template defined entirely in entry_codec.h
+ * and therefore has no corresponding translation unit.
+ */
+
+#include "kv/entry_codec.h"
+
+/**
+ * @details
+ * Layout written by this function:
+ * ```
+ * [ cksum(4) | klen(4) | vlen(4) | flag(1) | key(klen) | val(vlen) ]
+ * ```
+ * Steps:
+ * 1. Allocate the output buffer at the correct final size.
+ * 2. Fill `klen`, `vlen`, and `flag` in the header.
+ * 3. Copy key (and, for non-tombstones, value) into the payload region.
+ * 4. Compute CRC-32 over `[KLEN_OFFSET, end)` and write it into `CKSUM_OFFSET`.
+ */
 bytes EntryCodec::encode(const Entry &ent) {
     uint32_t klen = static_cast<uint32_t>(ent.key_.size());
     uint32_t vlen = ent.deleted_ ? 0 : static_cast<uint32_t>(ent.val_.size());

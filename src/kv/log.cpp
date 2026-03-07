@@ -1,11 +1,26 @@
+// src/kv/log.cpp
+
+/**
+ * @file log.cpp
+ * @brief Implementation of @ref Log and its file-header helpers.
+ */
+
 #include "core/types.h"
 #include "core/db_error.h"
 #include "core/bit_utils.h"
 #include "kv/log.h"
 #include "kv/log_format.h"
-#include <filesystem>
+#include <filesystem>   // std::filesystem::exists, file_size
 
-
+/**
+ * @brief Writes the 6-byte file header to @p fh.
+ *
+ * Must be called exactly once on a newly created (empty) log file.
+ * Layout: `[ magic(4) | version(2) ]`, both little-endian.
+ *
+ * @param fh An open, empty file handle positioned at offset 0.
+ * @return Empty error code on success; platform I/O error otherwise.
+ */
 static std::error_code write_file_header(FileHandle &fh) {
     std::array<std::byte, log_format::HEADER_SIZE> header;
 
@@ -18,6 +33,17 @@ static std::error_code write_file_header(FileHandle &fh) {
     return platform_write(fh, std::span<const std::byte>(header));
 }
 
+/**
+ * @brief Reads and validates the 6-byte file header from @p fh.
+ *
+ * Checks the magic number against @ref log_format::MAGIC and rejects files
+ * whose format version exceeds @ref log_format::FORMAT_VERSION.
+ *
+ * @param fh An open file handle positioned at offset 0.
+ * @return Empty error code on success; @ref db_error::bad_magic,
+ *         @ref db_error::unsupported_version, @ref db_error::truncated_header,
+ *         or a platform I/O error otherwise.
+ */
 static std::error_code read_and_validate_file_header(FileHandle &fh) {
     std::array<std::byte, log_format::HEADER_SIZE> header;
     size_t bytes_read = 0;
@@ -65,7 +91,7 @@ std::error_code Log::write(const Entry &ent) {
     if (auto err = platform_seek(fh_, 0, SEEK_END); err) return err;
 
     bytes data = EntryCodec::encode(ent);
-    if (auto err = platform_write(fh_, std::span<std::byte>(data)); err)
+    if (auto err = platform_write(fh_, std::span<const std::byte>(data)); err)
         return err;
     return platform_sync(fh_);
 }

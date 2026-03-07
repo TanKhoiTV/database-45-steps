@@ -1,7 +1,13 @@
-// src/row_codec.cpp
-#include "core/db_error.h"
+// src/table/row_codec.cpp
+
+/**
+ * @file row_codec.cpp
+ * @brief Implementation of @ref RowCodec key/value encode and decode methods.
+ */
+
+#include "core/db_error.h"      // db_error
 #include "table/row_codec.h"
-#include <utility>
+#include <utility>              // std::move
 
 bytes RowCodec::key_prefix(const Schema &schema) {
     auto prefix = bytes(5);

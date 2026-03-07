@@ -1,3 +1,10 @@
+// src/kv/kv.cpp
+
+/**
+ * @file kv.cpp
+ * @brief Implementation of the @ref KeyValue public interface.
+ */
+
 #include "core/types.h"
 #include "kv/kv.h"
 
