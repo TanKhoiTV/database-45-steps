@@ -1,26 +1,42 @@
+// test/table/test_table.cpp
+
+/**
+ * @file test_table.cpp
+ * @brief Integration tests for the @ref Table API: lifecycle, CRUD semantics,
+ *        upsert behaviour, and persistence across close/reopen cycles.
+ */
+
 #include <gtest/gtest.h>
-#include <filesystem>
-#include <iomanip>
+#include <filesystem>           // std::filesystem::remove
+#include <iomanip>              // std::setw (used by dump_file via test_utils)
 #include "kv/kv.h"
 #include "table/table.h"
 #include "table/row.h"
 #include "table/schema.h"
 #include "table/schema_codec.h"
-#include "test_utils.h"
+#include "core/db_error.h"      // db_error
+#include "test_utils.h"         // to_bytes
 
-const std::string test_db   = (std::filesystem::temp_directory_path() / "kvdb_table_test").string();
+/// Temporary database file used by every test in this translation unit.
+const std::string test_db = (std::filesystem::temp_directory_path() / "kvdb_table_test").string();
 
 // ---------------------------------------------------------------------------
-// Fixture — opens and closes data_store + schema_store around each test
+// Fixture
 // ---------------------------------------------------------------------------
 
+/**
+ * @brief Test fixture that opens a fresh @ref KeyValue store before each test
+ *        and removes the backing file afterwards.
+ */
 class TableTest : public ::testing::Test {
 protected:
+    /** @brief Removes any leftover file and opens a clean store. */
     void SetUp() override {
         std::filesystem::remove(test_db);
         ASSERT_FALSE(kv.open())   << "Failed to open KV";
     }
 
+    /** @brief Closes the store and removes the backing file. */
     void TearDown() override {
         kv.close();
         std::filesystem::remove(test_db);
@@ -33,6 +49,14 @@ protected:
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * @brief Builds the canonical three-column `link` schema used across tests.
+ *
+ * Columns: `time (i64)`, `src (str)`, `dst (str)`.
+ * Primary key: `(src, dst)` — columns at indices 1 and 2.
+ *
+ * @return A fully constructed @ref Schema with id=1.
+ */
 static Schema make_link_schema() {
     return Schema(
         1,
@@ -50,6 +74,10 @@ static Schema make_link_schema() {
 // Tests
 // ---------------------------------------------------------------------------
 
+/**
+ * @brief Verifies table creation, reopening, schema round-trip, and the
+ *        duplicate-create / missing-open error paths.
+ */
 TEST_F(TableTest, CreateAndOpen) {
     // Create succeeds
     auto created = Table::create(kv, make_link_schema());
@@ -75,6 +103,10 @@ TEST_F(TableTest, CreateAndOpen) {
     EXPECT_EQ(missing.error(), make_error_code(db_error::table_not_found));
 }
 
+/**
+ * @brief Verifies that `open_or_create` creates on first call and opens
+ *        (returning the same schema ID) on subsequent calls.
+ */
 TEST_F(TableTest, OpenOrCreate) {
     // First call creates
     auto first = Table::open_or_create(kv, make_link_schema());
@@ -86,6 +118,11 @@ TEST_F(TableTest, OpenOrCreate) {
     EXPECT_EQ(first.value().schema().id_, second.value().schema().id_);
 }
 
+/**
+ * @brief Exercises the full CRUD sequence: Select (miss), Insert, Insert
+ *        (duplicate), Select (hit), Update, Select (updated value), Update
+ *        (ghost key), Delete, Select (post-delete), Delete (already deleted).
+ */
 TEST_F(TableTest, SelectInsertUpdateDelete) {
     auto result = Table::create(kv, make_link_schema());
     ASSERT_TRUE(result.has_value()) << result.error().message();
@@ -174,6 +211,10 @@ TEST_F(TableTest, SelectInsertUpdateDelete) {
     EXPECT_FALSE(del2.value());
 }
 
+/**
+ * @brief Verifies Upsert semantics: insert on first call, no-op on identical
+ *        value, update on changed value.
+ */
 TEST_F(TableTest, UpsertBehavior) {
     auto result = Table::create(kv, make_link_schema());
     ASSERT_TRUE(result.has_value()) << result.error().message();
@@ -201,6 +242,10 @@ TEST_F(TableTest, UpsertBehavior) {
     EXPECT_TRUE(ups3.value());
 }
 
+/**
+ * @brief Inserts a row, closes and reopens the store, then verifies the
+ *        schema and row data are both recoverable.
+ */
 TEST_F(TableTest, Persistence) {
     // Create and populate
     {
@@ -225,15 +270,6 @@ TEST_F(TableTest, Persistence) {
     ASSERT_TRUE(reopened.has_value()) << reopened.error().message();
 
     const Schema &s = reopened.value().schema();
-    // std::cerr << "schema id:    " << s.id_   << "\n";
-    // std::cerr << "schema name:  " << s.name_ << "\n";
-    // std::cerr << "cols count:   " << s.cols_.size() << "\n";
-    // for (size_t i = 0; i < s.cols_.size(); ++i)
-    //     std::cerr << "  col[" << i << "] name=" << s.cols_[i].name_
-    //             << " type=" << static_cast<int>(s.cols_[i].type_) << "\n";
-    // std::cerr << "pkey count:   " << s.pkey_.size() << "\n";
-    // for (size_t i = 0; i < s.pkey_.size(); ++i)
-    // std::cerr << "  pkey[" << i << "] = " << s.pkey_[i] << "\n";
 
     // Reopen table — schema survives
     auto reopened2 = Table::open(kv, "link");
@@ -244,26 +280,6 @@ TEST_F(TableTest, Persistence) {
     Row query = table.new_row();
     query[1] = Cell::make_str(to_bytes("a"));
     query[2] = Cell::make_str(to_bytes("b"));
-
-    // Dump the encoded key before Select
-    // auto key = RowCodec::encode_key(s, query);
-    // if (key.has_value()) {
-    //     std::cerr << "encoded key (" << key.value().size() << " bytes): ";
-    //     for (auto b : key.value())
-    //         std::cerr << std::hex << std::setw(2) << std::setfill('0')
-    //                 << static_cast<int>(b) << " ";
-    //     std::cerr << std::dec << "\n";
-    // }
-
-    // Dump the raw value stored in KV
-    // auto raw = kv.get(key.value());
-    // if (raw.has_value() && raw.value().has_value()) {
-    //     std::cerr << "raw value (" << raw.value().value().size() << " bytes): ";
-    //     for (auto b : raw.value().value())
-    //         std::cerr << std::hex << std::setw(2) << std::setfill('0')
-    //                 << static_cast<int>(b) << " ";
-    //     std::cerr << std::dec << "\n";
-    // }
 
     auto sel = table.Select(query);
     ASSERT_TRUE(sel.has_value()) << sel.error().message();

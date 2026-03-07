@@ -1,9 +1,28 @@
+// test/table/test_cell.cpp
+
+/**
+ * @file test_cell.cpp
+ * @brief Unit tests for @ref CellCodec encode/decode round-trips.
+ *
+ * Verifies the exact wire representation and that the span cursor is
+ * fully consumed after decoding.
+ */
+
 #include <gtest/gtest.h>
 #include "table/cell.h"
 #include "table/cell_codec.h"
-#include <vector>
-#include <span>
+#include "core/types.h"  // bytes
+#include <vector>        // std::vector
+#include <span>          // std::span
 
+/**
+ * @brief Encodes and decodes an `i64` cell and a `str` cell, checking both
+ *        the exact byte layout and the round-trip value equality.
+ *
+ * Expected wire formats:
+ * - `i64(-2)` → 8 bytes little-endian two's complement: `FE FF FF FF FF FF FF FF`
+ * - `str("asdf")` → `04 00 00 00` (LE length) + `61 73 64 66`
+ */
 TEST(CellTest, EncodeDecode) {
     // --- Test I64 ---
     {

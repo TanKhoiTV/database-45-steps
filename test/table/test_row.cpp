@@ -1,14 +1,41 @@
-#include "test_utils.h"
-#include "table/row.h"
-#include "table/row_codec.h"
-#include "table/cell.h"
-#include "table/schema.h"
-#include "table/schema_codec.h"
-#include <gtest/gtest.h>
-#include <vector>
-#include <string>
-#include <cstdint>
+// test/table/test_row.cpp
 
+/**
+ * @file test_row.cpp
+ * @brief Unit tests for @ref RowCodec key/value encode and decode.
+ *
+ * Uses a concrete three-column schema (`time i64, src str, dst str`) with
+ * a composite primary key of (`src`, `dst`) to verify the exact binary
+ * layout and full round-trip correctness.
+ *
+ * Expected key bytes:
+ * ```
+ * 01 00 00 00       schema_id = 1 (LE)
+ * 00                ID_SEPARATOR
+ * 01 00 00 00 61    str "a" (len=1, data='a')
+ * 01 00 00 00 62    str "b" (len=1, data='b')
+ * ```
+ * Expected value bytes:
+ * ```
+ * 7B 00 00 00 00 00 00 00   i64 123 (LE)
+ * ```
+ */
+
+#include <gtest/gtest.h>
+#include "test_utils.h"         // to_bytes
+#include "table/row.h"          // Row
+#include "table/row_codec.h"    // RowCodec
+#include "table/cell.h"         // Cell
+#include "table/schema.h"       // Schema, ColumnHeader
+#include "table/schema_codec.h" // SchemaCodec (included for completeness)
+#include <vector>               // std::vector
+#include <string>               // std::string
+#include <cstdint>              // uint32_t
+
+/**
+ * @brief Verifies key encoding, value encoding, and full decode round-trip
+ *        for a representative three-column row.
+ */
 TEST(RowTest, BasicOps) {
     auto schema = Schema{
         static_cast<uint32_t>(0x00000001),
