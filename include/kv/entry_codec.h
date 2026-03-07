@@ -1,48 +1,87 @@
+// include/kv/entry_codec.h
 #pragma once
+
+/**
+ * @file entry_codec.h
+ * @brief Binary serialisation and deserialisation of @ref Entry objects.
+ *
+ * Wire format for a single entry:
+ * ```
+ * [ cksum(4) | klen(4) | vlen(4) | flag(1) | key(klen) | val(vlen) ]
+ * ```
+ * All multi-byte integers are little-endian.
+ * The CRC-32 (IEEE 802.3) covers every byte from `klen` onward (i.e. the
+ * checksum field itself is excluded from the digest).
+ * Deleted entries (tombstones) omit the value payload (`vlen` is written as 0).
+ */
 
 #include "kv/entry.h"
 #include "core/types.h"
 #include "core/db_error.h"
 #include "core/bit_utils.h"
 #include "core/reader.h"
-#include <cstdint>
-#include <variant>
-#include <span>
-#include <array>
-#include <expected>
+#include <cstdint>      // uint32_t
+#include <variant>      // std::variant
+#include <span>         // std::span
+#include <array>        // std::array
+#include <expected>     // std::expected
 
+/** @brief Sentinel returned by @ref EntryCodec::decode when the stream is exhausted. */
 struct EntryEOF {};
 
+/**
+ * @brief Result type of @ref EntryCodec::decode.
+ *
+ * Contains either a decoded @ref Entry, an @ref EntryEOF sentinel, or an
+ * `std::error_code` on failure.
+ */
 using DecodeResult = std::expected<std::variant<Entry, EntryEOF>, std::error_code>;
 
 /**
- * @brief Handles Entry serialization format and logic.
+ * @brief Stateless codec for the Entry binary format.
  *
+ * Both `encode` and `decode` are static; the struct exists solely to
+ * namespace the layout constants alongside the logic that uses them.
  */
 struct EntryCodec {
-    // Header layout constants
-    static constexpr size_t CKSUM_OFFSET = 0;
-    static constexpr size_t KLEN_OFFSET = CKSUM_OFFSET + 4;
-    static constexpr size_t VLEN_OFFSET = KLEN_OFFSET + 4;
-    static constexpr size_t FLAG_OFFSET = VLEN_OFFSET + 4;
-    static constexpr size_t HEADER_SIZE = FLAG_OFFSET + 1;
+    /** @name Header layout (byte offsets within the fixed-size header) @{ */
+    static constexpr size_t CKSUM_OFFSET = 0;                       ///< CRC-32 checksum field (4 bytes).
+    static constexpr size_t KLEN_OFFSET  = CKSUM_OFFSET + 4;        ///< Key-length field (4 bytes).
+    static constexpr size_t VLEN_OFFSET  = KLEN_OFFSET  + 4;        ///< Value-length field (4 bytes).
+    static constexpr size_t FLAG_OFFSET  = VLEN_OFFSET  + 4;        ///< Deletion-flag field (1 byte).
+    static constexpr size_t HEADER_SIZE  = FLAG_OFFSET  + 1;        ///< Total header size in bytes.
+    /** @} */
 
-    // Safety Limits
-    static constexpr size_t MAX_KEY_SIZE = 1024;            // 1 KB limit
-    static constexpr size_t MAX_VAL_SIZE = 1024 * 1024;     // 1 MB limit
+    /** @name Safety limits @{ */
+    static constexpr size_t MAX_KEY_SIZE = 1024;            ///< Maximum permitted key size (1 KiB).
+    static constexpr size_t MAX_VAL_SIZE = 1024 * 1024;     ///< Maximum permitted value size (1 MiB).
+    /** @} */
 
     /**
-     * @brief Serializes the entry into a byte buffer.
-     * Format: `[ cksum(4) | klen(4) | vlen(4) | flag(1) | key | val ]`.
-     * @return bytes containing the encoded entry.
+     * @brief Serialises @p ent into a heap-allocated byte buffer.
+     *
+     * The CRC-32 digest is computed over all header bytes starting at
+     * @ref KLEN_OFFSET and over the entire payload, then written into
+     * @ref CKSUM_OFFSET.  Tombstones (`deleted_ == true`) omit the value
+     * bytes and write `vlen = 0`.
+     *
+     * @param ent The entry to encode.
+     * @return A @ref bytes buffer containing the complete on-disk representation.
      */
     static bytes encode(const Entry &ent);
 
     /**
-     * @brief Deserializes an entry by reading from a FileHandle.
+     * @brief Deserialises the next entry from @p reader.
      *
-     * @param reader
-     * @return std::error_code
+     * Reads the fixed-size header first, then the variable-length payload.
+     * Validates the CRC-32 checksum before constructing the @ref Entry.
+     * Returns @ref EntryEOF when the reader signals EOF on the very first
+     * byte of the header (i.e. a clean end-of-log).
+     *
+     * @tparam R Any type satisfying the @ref Reader concept.
+     * @param reader Source of raw bytes (typically a @ref FileHandle).
+     * @return A @ref DecodeResult holding the decoded @ref Entry, @ref EntryEOF,
+     *         or an `std::error_code` on failure.
      */
     template <Reader R> static DecodeResult decode(R &reader);
 };

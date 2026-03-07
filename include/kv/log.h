@@ -1,87 +1,117 @@
+// include/kv/log.h
 #pragma once
+
+/**
+ * @file log.h
+ * @brief Append-only, file-backed log of encoded @ref Entry records.
+ */
 
 #include "core/platform.h"
 #include "kv/entry_codec.h"
-#include <string>
-#include <system_error>
+#include <string>       // std::string
+#include <system_error> // std::error_code
 
+/** @brief Sentinel returned by @ref Log::read when the end of the log is reached. */
 struct LogEOF {};
 
+/**
+ * @brief Result type of @ref Log::read.
+ *
+ * Contains either a decoded @ref Entry, a @ref LogEOF sentinel on clean
+ * end-of-log, or an `std::error_code` on a hard read failure.
+ */
 using ReadResult = std::expected<std::variant<Entry, LogEOF>, std::error_code>;
 
 /**
- * @brief Simple file-backed append/read log for encoded Entry objects
+ * @brief Append-only, file-backed log of @ref Entry records.
  *
- * Manages a file stream used to append encoded entries and decode entries from the file.
+ * Manages a single file whose layout is:
+ * ```
+ * [ file_header(6) | entry ... | entry ... | ... ]
+ * ```
+ * New entries are always appended; existing entries are never mutated.
+ * On open, the file header is validated (magic number + format version).
+ * If the file does not yet exist it is created and the header is written.
  *
- * @note This class is not thread-safe. Callers must synchronize access if the same Log instance is used concurrently.
+ * Tail corruption (bad checksum, truncated header/payload) is treated
+ * silently as EOF on @ref read so that a crash mid-write does not
+ * permanently poison the log.
+ *
+ * @note Not thread-safe. Callers must serialise concurrent access externally.
  */
 class Log {
-    private:
-
     std::string filename_;
-    FileHandle fh_;
+    FileHandle  fh_;
 
-    public:
-
+public:
     /**
-     * @brief Construct a new Log object
+     * @brief Constructs a Log bound to the file at @p fname.
      *
-     * @param fname Path to the log file. The path is stored by value.
+     * Does not open the file; call @ref open before any I/O.
      *
-     * The constructor does not open the file; call `open()` to create/open the underlying file stream.
+     * @param fname Path to the log file (stored by value).
      */
     explicit Log(std::string fname) : filename_(std::move(fname)) {}
 
-    Log(Log &&) = default;
+    Log(Log &&)            = default;
     Log &operator=(Log &&) = default;
 
-
     /**
-     * @brief open the log file for appending and reading.
+     * @brief Opens (or creates) the log file and validates its header.
      *
-     * Perform these checks/steps:
+     * If the file already exists its magic number and format version are
+     * checked; a brand-new file gets a freshly written header.
+     * Returns immediately without re-opening if the file is already open.
      *
-     * - Returns an error if @p filename exists and is a directory.
+     * Possible errors: `std::errc::is_a_directory`, @ref db_error::bad_magic,
+     * @ref db_error::unsupported_version, @ref db_error::truncated_header,
+     * or any OS-level I/O error.
      *
-     * - Attempts to open the file with: in | out | binary | app; creates the file if it doesn't exist.
-     *
-     * - On failure maps common @c errno values to `std::errc`-derived errors.
-     *
-     * - Clears any EOF flags on success so subsequent streaming operations are usable.
-     *
-     * @return error Default-constructed (no error) on success; otherwise an error code describing the failure.
+     * @return Empty error code on success; a descriptive error otherwise.
      */
     std::error_code open();
 
     /**
-     * @brief close the underlying file stream.
-     *
-     * @return error No error on success; `io_error` otherwise.
+     * @brief Flushes and closes the underlying file handle.
+     * @return Empty error code on success; `std::errc::io_error` otherwise.
      */
     std::error_code close();
 
     /**
-     * @brief Append an encoded Entry to the log file
+     * @brief Encodes @p ent and appends it to the log.
      *
-     * @param ent Entry to encode and write
-     * @return error
-     * @note The method assumes the file stream is opened.
-     * Behavior is undefined or an I/O error is triggered if called on a closed stream.
+     * Seeks to EOF before writing so concurrent readers are not disturbed,
+     * then calls @ref platform_sync to make the write durable.
+     *
+     * @param ent The entry to persist.
+     * @return Empty error code on success; an I/O error otherwise.
+     * @pre The log must be open; calling this on a closed log is undefined behaviour.
      */
     std::error_code write(const Entry &ent);
 
     /**
-     * @brief Read and decode the next entry from the file stream.
+     * @brief Decodes and returns the next @ref Entry from the current file position.
      *
-     * @param[out] ent Entry object to be populated with decoded data.
-     * @return `std::pair<bool, error>` The boolean signifies EOF in which case no error is returned.
+     * Tail corruption (@ref db_error::bad_checksum, @ref db_error::truncated_header,
+     * @ref db_error::truncated_payload) is silently converted to @ref LogEOF so
+     * that a crash-interrupted final write does not prevent the log from loading.
+     *
+     * @return A @ref ReadResult containing an @ref Entry, @ref LogEOF, or an error.
      */
     ReadResult read();
 
+    /**
+     * @brief Seeks the file position to the first entry (just past the file header).
+     *
+     * Call this before iterating over entries with @ref read.
+     *
+     * @return Empty error code on success; an I/O error otherwise.
+     */
     std::error_code seek_to_first_entry();
 
+    /** @return `true` if the underlying file handle is currently open. */
     bool is_open() const noexcept { return fh_.is_open(); }
 
+    /** @brief Closes the file silently if still open; prefer @ref close for error handling. */
     ~Log();
 };
