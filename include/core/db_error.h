@@ -1,6 +1,15 @@
 // include/core/db_error.h
 #pragma once
 
+/**
+ * @file db_error.h
+ * @brief Database-specific error codes and their `std::error_code` integration.
+ *
+ * Defines the `db_error` enumeration and the machinery that plugs it into
+ * the standard `<system_error>` framework, allowing `db_error` values to be
+ * used wherever an `std::error_code` is expected.
+ */
+
 #include <system_error>     // std::error_code, std::error_category
 #include <string>           // std::string
 
