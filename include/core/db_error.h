@@ -1,3 +1,4 @@
+// include/core/db_error.h
 #pragma once
 
 #include <system_error>     // std::error_code, std::error_category
