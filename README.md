@@ -322,6 +322,7 @@ All multi-byte integers are little-endian. A `flag` of `1` marks a tombstone (de
 
 | Version | Date       | Description                                                                                |
 |---------|------------|----------------------------------------------------------                                  |
+| 0.8.0   | 2026-03-11 | Add relational table layer with schema, typed cells, and row codecs on top of KV.          |
 | 0.7.0   | 2026-02-26 | Update KV methods: change return types to `std::expected` and add Set's `UpdateMode`       |
 | 0.6.0   | 2026-02-25 | Upgrade the platform to C++23 with some internal changes and add Windows support.          |
 | 0.5.0   | 2026-02-24 | Add integrity checks on every entry.                                                       |
